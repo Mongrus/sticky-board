@@ -179,20 +179,15 @@ function resizeSticker(e, id, corner) {
                 backgroundColor: sticker.bc,
                 fontSize: sticker.fs + 'px'
             }"
-            >{{ sticker.text }}</textarea>
+            v-model="sticker.text"
+            ></textarea>
         <div class="resize resize__resize-lt"@pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
         <div class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
         <div class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
         <div class="sticker-menu">
             <button @click="">⚙︎</button>
             <button @click="">-</button>
-            <button @click="">X</button>
-            <div style="color: white">
-                <p>w -> {{ Math.round(sticker.w) }}</p>
-                <p>h -> {{ Math.round(sticker.h) }}</p>
-                <p>x -> {{ Math.round(sticker.x) }}</p>
-                <p>y -> {{ Math.round(sticker.y) }}</p>
-            </div>
+            <button @pointerdown.stop @click="store.destroySticker(sticker.id)">X</button>
         </div>
     </div>
 </template>
@@ -202,6 +197,7 @@ function resizeSticker(e, id, corner) {
 .sticker
     position: absolute
     will-change: transform
+    border: 1px unset red
     transform: translateZ(0)
     touch-action: none
     user-select: none
@@ -213,7 +209,7 @@ function resizeSticker(e, id, corner) {
     height: 100%
     padding: 15px
     touch-action: none
-    color: white
+    color: black
     cursor: grab
     resize: none
     border: none
@@ -225,6 +221,19 @@ function resizeSticker(e, id, corner) {
     position: absolute
     top: -22px
     right: 0
+    button
+        background-color: green
+        padding: 0
+        text-align: center
+        border-radius: 100%
+        font-size: 10px
+        width: 15px
+        height: 15px
+        &:first-child
+            background-color: gray
+        &:last-child
+            background-color: red
+
 
 .resize
     position: absolute

@@ -42,13 +42,18 @@ export const useMainStore = defineStore('stickers', () => {
     sticker.z = maxZ + 1
     }
 
+    function destroySticker(id) {
+        stickers.value = stickers.value.filter(s => s.id !== id)
+    }
+
     return {
         stickers,
         settings,
         createSticker,
         setPositionSticker,
         setSizeSticker,
-        bringToFront
+        bringToFront,
+        destroySticker
     }
 
 })

@@ -1,5 +1,6 @@
 <script setup>
 import Sticker from './components/Sticker.vue';
+import { STICKER_COLORS } from './constants/sticker.constants';
 import { useMainStore } from './stores/main.store';
 
 const store = useMainStore();
@@ -16,7 +17,7 @@ const store = useMainStore();
         !store.stickers.length ? 20 : store.stickers.length * 10 + 20, // по Y
         store.settings.width, // Ширина
         store.settings.height, // Высота
-        store.settings.backgroundColor, // Цвет фона
+        STICKER_COLORS[Math.floor(Math.random() * STICKER_COLORS.length)].value, // Цвет фона
         store.settings.fontSize, // Размер шрифта
         Math.max(...store.stickers.map(s => s.z), 0) // z-index
         )">+</button>
