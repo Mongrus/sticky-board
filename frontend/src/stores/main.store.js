@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { STICKER } from '../constants/sticker.constants'
 
 export const useMainStore = defineStore('stickers', () => {
     
     const stickers = ref([]);
     const settings = ref({
         width: 300,
-        height: 140,
+        height: 180,
         backgroundColor: 'black',
         fontSize: 14
     });
@@ -22,26 +23,14 @@ export const useMainStore = defineStore('stickers', () => {
         sticker.y = y
     }
 
-    function setSizeSticker(id, deltaX, deltaY, corner) {
-        const sticker = stickers.value.find(s => s.id === id)
+    function setSizeSticker(id, w, h, x, y) {
 
-        if (corner === 'rb') {
-            sticker.w += deltaX
-            sticker.h += deltaY
-        }
+    const sticker = stickers.value.find(s => s.id === id)
 
-        if (corner === 'lb') {
-            sticker.w -= deltaX
-            sticker.h += deltaY
-            sticker.x += deltaX
-        }
-
-        if (corner === 'lt') {
-            sticker.w -= deltaX
-            sticker.h -= deltaY
-            sticker.x += deltaX
-            sticker.y += deltaY
-        }
+    sticker.w = w
+    sticker.h = h
+    sticker.x = x
+    sticker.y = y
     }
 
     function bringToFront(id) {

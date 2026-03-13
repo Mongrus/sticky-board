@@ -1,5 +1,6 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
+import { STICKER } from '@/constants/sticker.constants';
 
 const store = useMainStore();
 
@@ -72,6 +73,11 @@ function resizeSticker(e, id, corner) {
     const startLeft = sticker.x
     const startTop = sticker.y
 
+    let finalW = startW
+    let finalH = startH
+    let finalX = startLeft
+    let finalY = startTop
+
     let dx = 0
     let dy = 0
 
@@ -103,10 +109,32 @@ function resizeSticker(e, id, corner) {
             y = startTop + dy
         }
 
+        if (w < STICKER.MIN_WIDTH) {
+            w = STICKER.MIN_WIDTH
+
+            if (corner === 'lb' || corner === 'lt') {
+                x = startLeft + (startW - STICKER.MIN_WIDTH)
+            }
+        }
+
+        if (h < STICKER.MIN_HEIGHT) {
+            h = STICKER.MIN_HEIGHT
+
+            if (corner === 'lt') {
+                y = startTop + (startH - STICKER.MIN_HEIGHT)
+            }
+        }
+
+        finalW = w
+        finalH = h
+        finalX = x
+        finalY = y
+
+        el.style.transform =
+        `translate(${x - startLeft}px, ${y - startTop}px)`
+
         el.style.width = w + 'px'
         el.style.height = h + 'px'
-        el.style.left = x + 'px'
-        el.style.top = y + 'px'
     }
 
     const stop = (ev) => {
@@ -117,7 +145,9 @@ function resizeSticker(e, id, corner) {
             el.releasePointerCapture(ev.pointerId)
         }
 
-        store.setSizeSticker(id, dx, dy, corner)
+        el.style.transform = ''
+
+        store.setSizeSticker(id, finalW, finalH, finalX, finalY)
 
         window.removeEventListener('pointermove', resize)
         window.removeEventListener('pointerup', stop)
@@ -157,6 +187,12 @@ function resizeSticker(e, id, corner) {
             <button @click="">⚙︎</button>
             <button @click="">-</button>
             <button @click="">X</button>
+            <div style="color: white">
+                <p>w -> {{ Math.round(sticker.w) }}</p>
+                <p>h -> {{ Math.round(sticker.h) }}</p>
+                <p>x -> {{ Math.round(sticker.x) }}</p>
+                <p>y -> {{ Math.round(sticker.y) }}</p>
+            </div>
         </div>
     </div>
 </template>
@@ -169,11 +205,13 @@ function resizeSticker(e, id, corner) {
     transform: translateZ(0)
     touch-action: none
     user-select: none
+    min-width: 300px
+    min-height: 140px
     
 .content
     width: 100%
     height: 100%
-    padding: 10px
+    padding: 15px
     touch-action: none
     color: white
     cursor: grab
