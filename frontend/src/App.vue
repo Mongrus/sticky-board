@@ -10,7 +10,7 @@ const store = useMainStore();
 <template>
   <header>
     <button @click="store.createSticker(
-        store.stickers.length, 
+        store.nextId, 
         '', // Текст
         false, // Свернут ?
         !store.stickers.length ? 20 : store.stickers.length * 10 + 20, // по X
@@ -21,6 +21,7 @@ const store = useMainStore();
         store.settings.fontSize, // Размер шрифта
         Math.max(...store.stickers.map(s => s.z), 0) // z-index
         )">+</button>
+    <button @click="store.clearBoard()">Очистить</button>
   </header>
   <main>
     <div>

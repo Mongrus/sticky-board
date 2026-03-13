@@ -19,6 +19,8 @@ function moveSticker(e, id) {
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
 
+    document.body.style.cursor = 'grabbing'
+
     const startX = e.clientX
     const startY = e.clientY
 
@@ -34,6 +36,8 @@ function moveSticker(e, id) {
     }
 
     const stop = (ev) => {
+
+        document.body.style.cursor = ''
 
         if (el.hasPointerCapture(ev.pointerId)) {
             el.releasePointerCapture(ev.pointerId)
@@ -185,10 +189,11 @@ function resizeSticker(e, id, corner) {
         <div class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
         <div class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
         <div class="sticker-menu">
-            <button @click="">⚙︎</button>
+            <button @click="">⚙</button>
             <button @click="">-</button>
             <button @pointerdown.stop @click="store.destroySticker(sticker.id)">X</button>
         </div>
+        <pre>№{{ sticker.id }}</pre>
     </div>
 </template>
 
@@ -198,6 +203,7 @@ function resizeSticker(e, id, corner) {
     position: absolute
     will-change: transform
     border: 1px unset red
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 6px 12px rgba(0,0,0,0.08)
     transform: translateZ(0)
     touch-action: none
     user-select: none
@@ -219,20 +225,37 @@ function resizeSticker(e, id, corner) {
 
 .sticker-menu
     position: absolute
+    display: flex
+    flex-direction: row
+    justify-content: center
+    align-items: center
     top: -22px
     right: 0
     button
-        background-color: green
+        background-color: #f5f5f5
+        border: none
+        color: green
         padding: 0
         text-align: center
         border-radius: 100%
         font-size: 10px
         width: 15px
         height: 15px
+        transition: .3s
+        &:hover
+            transition: .3s
+            color: white
+            background-color: green
         &:first-child
-            background-color: gray
+            color: gray
+            &:hover
+                color: white
+                background-color: gray
         &:last-child
-            background-color: red
+            color: red
+            &:hover
+                color: white
+                background-color: red
 
 
 .resize

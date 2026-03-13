@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { STICKER } from '../constants/sticker.constants'
 
 export const useMainStore = defineStore('stickers', () => {
     
     const stickers = ref([]);
+    const nextId = ref(1);
     const settings = ref({
         width: 300,
         height: 180,
@@ -13,6 +13,7 @@ export const useMainStore = defineStore('stickers', () => {
     });
 
     function createSticker(id, text, folded, x, y, w, h, bc, fs, z) {
+        nextId.value++;
         stickers.value.push({id, text, folded, x, y, w, h, bc, fs, z});
     }
 
@@ -46,14 +47,21 @@ export const useMainStore = defineStore('stickers', () => {
         stickers.value = stickers.value.filter(s => s.id !== id)
     }
 
+    function clearBoard() {
+        nextId.value = 1;
+        stickers.value = [];
+    }
+
     return {
         stickers,
         settings,
+        nextId,
         createSticker,
         setPositionSticker,
         setSizeSticker,
         bringToFront,
-        destroySticker
+        destroySticker,
+        clearBoard
     }
 
 })
