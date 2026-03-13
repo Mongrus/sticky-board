@@ -10,14 +10,15 @@ const store = useMainStore();
   <header>
     <button @click="store.createSticker(
         store.stickers.length, 
-        '', 
-        false, 
-        !store.stickers.length ? 20 : store.stickers.length * 10 + 20, 
-        !store.stickers.length ? 20 : store.stickers.length * 10 + 20, 
-        store.settings.width, 
-        store.settings.height, 
-        store.settings.backgroundColor, 
-        store.settings.fontSize
+        '', // Текст
+        false, // Свернут ?
+        !store.stickers.length ? 20 : store.stickers.length * 10 + 20, // по X
+        !store.stickers.length ? 20 : store.stickers.length * 10 + 20, // по Y
+        store.settings.width, // Ширина
+        store.settings.height, // Высота
+        store.settings.backgroundColor, // Цвет фона
+        store.settings.fontSize, // Размер шрифта
+        Math.max(...store.stickers.map(s => s.z), 0) // z-index
         )">+</button>
   </header>
   <main>

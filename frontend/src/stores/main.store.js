@@ -11,8 +11,8 @@ export const useMainStore = defineStore('stickers', () => {
         fontSize: 14
     });
 
-    function createSticker(id, text, folded, x, y, w, h, bc, fs) {
-        stickers.value.push({id, text, folded, x, y, w, h, bc, fs});
+    function createSticker(id, text, folded, x, y, w, h, bc, fs, z) {
+        stickers.value.push({id, text, folded, x, y, w, h, bc, fs, z});
     }
 
     function setPositionSticker(id, x, y) {
@@ -22,11 +22,44 @@ export const useMainStore = defineStore('stickers', () => {
         sticker.y = y
     }
 
+    function setSizeSticker(id, deltaX, deltaY, corner) {
+        const sticker = stickers.value.find(s => s.id === id)
+
+        if (corner === 'rb') {
+            sticker.w += deltaX
+            sticker.h += deltaY
+        }
+
+        if (corner === 'lb') {
+            sticker.w -= deltaX
+            sticker.h += deltaY
+            sticker.x += deltaX
+        }
+
+        if (corner === 'lt') {
+            sticker.w -= deltaX
+            sticker.h -= deltaY
+            sticker.x += deltaX
+            sticker.y += deltaY
+        }
+    }
+
+    function bringToFront(id) {
+
+    const sticker = stickers.value.find(s => s.id === id)
+
+    const maxZ = Math.max(...stickers.value.map(s => s.z), 0)
+
+    sticker.z = maxZ + 1
+    }
+
     return {
         stickers,
         settings,
         createSticker,
-        setPositionSticker
+        setPositionSticker,
+        setSizeSticker,
+        bringToFront
     }
 
 })
