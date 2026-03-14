@@ -1,8 +1,10 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
-import { STICKER } from '@/constants/sticker.constants';
+import { STICKER, STICKER_COLORS, STICKER_FONTS } from '@/constants/sticker.constants';
+import { ref } from 'vue';
 
 const store = useMainStore();
+const settingsSticker = ref(false);
 
 const {sticker} = defineProps({
     sticker: Object
@@ -163,10 +165,14 @@ function resizeSticker(e, id, corner) {
     window.addEventListener('pointercancel', stop)
 }
 
+function changingStickerSettings() {
+    settingsSticker.value = !settingsSticker.value
+}
+
 </script>
 
 <template>
-        <div
+    <div
         class="sticker"
         :style="{
             width: sticker.w + 'px',
@@ -177,23 +183,60 @@ function resizeSticker(e, id, corner) {
         }"
         @pointerdown="moveSticker($event, sticker.id)"
         >
-            <textarea
+            <textarea v-if="!settingsSticker"
             class="content"
             :style="{
                 backgroundColor: sticker.bc,
+                fontFamily: sticker.font,
                 fontSize: sticker.fs + 'px'
             }"
             v-model="sticker.text"
             ></textarea>
+            <div v-else class="settings-sticker">
+                <label>Цвет фона:</label>
+                <div class="color-palette">
+                    <button
+                        v-for="color in STICKER_COLORS"
+                        :key="color.value"
+                        class="color-palette__color"
+                        :style="{ backgroundColor: color.value }"
+                        :class="{ active: sticker.bc === color.value }"
+                        @pointerdown.stop @click="sticker.bc = color.value"
+                    ></button>
+                </div>
+                <label>Шрифт:</label>
+                <select v-model="sticker.font">
+                        <option v-for="font in STICKER_FONTS" :value="font.value">{{ font.label }}</option>
+                </select>
+                <label>Размер шрифта:</label>
+                <input type="number" v-model="sticker.fs">
+            </div>
         <div class="resize resize__resize-lt"@pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
         <div class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
         <div class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
-        <div class="sticker-menu">
-            <button @click="">⚙</button>
-            <button @click="">-</button>
-            <button @pointerdown.stop @click="store.destroySticker(sticker.id)">X</button>
+        <div class="sticker__id">
+            <pre>№{{ sticker.id }}</pre>
         </div>
-        <pre>№{{ sticker.id }}</pre>
+        <div class="sticker-menu">
+            <button 
+            @pointerdown.stop 
+            @click="changingStickerSettings()"
+            class="sticker-menu__btn-settings"
+            :class="{ active: settingsSticker }"
+            >⚙</button>
+
+            <button
+            @pointerdown.stop
+            @click=""
+            class="sticker-menu__btn-collapse"
+            >-</button>
+
+            <button 
+            @pointerdown.stop 
+            @click="store.destroySticker(sticker.id)"
+            class="sticker-menu__btn-delete"
+            >X</button>
+        </div>
     </div>
 </template>
 
@@ -209,6 +252,20 @@ function resizeSticker(e, id, corner) {
     user-select: none
     min-width: 300px
     min-height: 140px
+    &:hover .sticker__id
+        opacity: .1
+        transition: .3s
+    &__id
+        position: absolute
+        right: 0
+        bottom: 0
+        font-size: 25px
+        padding: 3px
+        opacity: .08
+        font-weight: bold
+        pointer-events: none
+        transition: .3s
+        opacity: 0
     
 .content
     width: 100%
@@ -234,28 +291,33 @@ function resizeSticker(e, id, corner) {
     button
         background-color: #f5f5f5
         border: none
-        color: green
         padding: 0
         text-align: center
         border-radius: 100%
-        font-size: 10px
-        width: 15px
-        height: 15px
+        font-size: 12px
+        width: 18px
+        height: 18px
         transition: .3s
+    button:active
+        transform: scale(.9)
+    &__btn-settings
+        color: gray
         &:hover
-            transition: .3s
+            color: white
+            background-color: gray
+        &.active
+            color: white
+            background-color: gray
+    &__btn-collapse
+        color: green    
+        &:hover
             color: white
             background-color: green
-        &:first-child
-            color: gray
-            &:hover
-                color: white
-                background-color: gray
-        &:last-child
-            color: red
-            &:hover
-                color: white
-                background-color: red
+    &__btn-delete
+        color: red
+        &:hover
+            color: white
+            background-color: red
 
 
 .resize
@@ -280,5 +342,31 @@ function resizeSticker(e, id, corner) {
         left: -2px
         bottom: -2px
         cursor: nwse-resize
+
+.settings-sticker
+    display: flex
+    flex-direction: column
+    background-color: #f5f5f5
+    padding: 15px
+    overflow: auto
+    width: 100%
+    height: 100%
+
+.color-palette
+    display: flex
+    flex-direction: row
+    flex-wrap: wrap
+    gap: 6px
+    &__color
+        width: 20px
+        height: 20px
+        border-radius: 50%
+        border: .3px solid black
+        cursor: pointer
+        transition: transform .15s ease
+        &:hover
+            transform: scale(1.15)
+        &.active
+            border: 3px solid crimson
 
 </style>

@@ -1,6 +1,6 @@
 <script setup>
 import Sticker from './components/Sticker.vue';
-import { STICKER_COLORS } from './constants/sticker.constants';
+import { STICKER_COLORS, STICKER } from './constants/sticker.constants';
 import { useMainStore } from './stores/main.store';
 
 const store = useMainStore();
@@ -18,9 +18,10 @@ const store = useMainStore();
         store.settings.width, // Ширина
         store.settings.height, // Высота
         STICKER_COLORS[Math.floor(Math.random() * STICKER_COLORS.length)].value, // Цвет фона
+        STICKER.DEFAULT_FONT, // Шрифт
         store.settings.fontSize, // Размер шрифта
         Math.max(...store.stickers.map(s => s.z), 0) // z-index
-        )">+</button>
+        )">Создать +</button>
     <button @click="store.clearBoard()">Очистить</button>
   </header>
   <main>

@@ -9,12 +9,13 @@ export const useMainStore = defineStore('stickers', () => {
         width: 300,
         height: 180,
         backgroundColor: 'black',
+        font: 'Roboto, sans-serif',
         fontSize: 14
     });
 
-    function createSticker(id, text, folded, x, y, w, h, bc, fs, z) {
+    function createSticker(id, text, folded, x, y, w, h, bc, font, fs, z) {
         nextId.value++;
-        stickers.value.push({id, text, folded, x, y, w, h, bc, fs, z});
+        stickers.value.push({id, text, folded, x, y, w, h, bc, font, fs, z});
     }
 
     function setPositionSticker(id, x, y) {
