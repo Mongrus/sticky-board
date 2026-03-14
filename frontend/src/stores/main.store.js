@@ -35,6 +35,12 @@ export const useMainStore = defineStore('stickers', () => {
     sticker.y = y
     }
 
+    function setFoldedSticker(id) {
+        const sticker = stickers.value.find((sticker) => sticker.id === id)
+
+        sticker.folded = !sticker.folded;
+    }
+
     function bringToFront(id) {
 
     const sticker = stickers.value.find(s => s.id === id)
@@ -60,6 +66,7 @@ export const useMainStore = defineStore('stickers', () => {
         createSticker,
         setPositionSticker,
         setSizeSticker,
+        setFoldedSticker,
         bringToFront,
         destroySticker,
         clearBoard

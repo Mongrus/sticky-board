@@ -227,7 +227,7 @@ function changingStickerSettings() {
 
             <button
             @pointerdown.stop
-            @click=""
+            @click="store.setFoldedSticker(sticker.id)"
             class="sticker-menu__btn-collapse"
             >-</button>
 
