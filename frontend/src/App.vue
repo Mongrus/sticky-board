@@ -14,15 +14,26 @@ const activeGeneralSettings = ref(false);
         <div class="board">
           <Sticker v-for="sticker in store.stickers.filter(s => !s.folded)" :sticker="sticker" :key="sticker.id"/>
         </div>
-        <div v-show="activeGeneralSettings" class="general-settings-panel">
-        </div>
         <div class="collapsed-panel" v-if="store.stickers.some(s => s.folded)">
             <button 
-            class="collapsed-panel__sticker" 
-            v-for="sticker in store.stickers.filter(s => s.folded)" 
-            :style="{ backgroundColor: sticker.bc }"
-            @click="store.setFoldedSticker(sticker.id)"
-            ><p>№{{ sticker.id }}</p></button>
+                class="collapsed-panel__sticker" 
+                v-for="sticker in store.stickers.filter(s => s.folded)" 
+                :style="{ backgroundColor: sticker.bc, color: store.getTextColor(sticker.bc) }"
+                @click="store.setFoldedSticker(sticker.id)"
+            >
+                <p>№{{ sticker.id }}</p>
+            </button>
+        </div>
+        <div v-show="activeGeneralSettings" class="general-settings-panel">
+            <h3>Настройки по-умолчанию</h3>
+            <label>Основная тема стикеров:</label>
+            <select v-model="store.settings.backgroundColor">
+                <option value="color">Случайный цвет</option>
+                <option value="black">Темная</option>
+                <option value="snow">Светлая</option>
+            </select>
+            <label>Размер шрифта:</label>
+            <input type="number" v-model="store.settings.fontSize">
         </div>
         <div class="toolbar">
             <button 
@@ -35,9 +46,10 @@ const activeGeneralSettings = ref(false);
                 !store.stickers.length ? 100 : store.stickers.length * 10 + 100, // по Y
                 store.settings.width, // Ширина
                 store.settings.height, // Высота
-                STICKER_COLORS[Math.floor(Math.random() * STICKER_COLORS.length)].value, // Цвет фона
+                store.getDefaultColor(), // Цвет фона
                 STICKER.DEFAULT_FONT, // Шрифт
                 store.settings.fontSize, // Размер шрифта
+                store.getTextColor(store.getDefaultColor()), // Цвет текста
                 Math.max(...store.stickers.map(s => s.z), 0) // z-index
                 )">Создать +</button>
             <button class="toolbar__btn-clear" @click="store.clearBoard()">Очистить</button>
@@ -79,7 +91,11 @@ main
     background-color: #F5F8FC
     box-shadow: 0 4px 14px rgba(0,0,0,0.12)
     border: 1px solid rgba(0,0,0,0.06)
+    transition: .3s
     z-index: 9999
+    &:hover
+        transition: .3s
+        background-color: #EDF3FA
     button
         padding: 5px 14px
         border-radius: 10px
@@ -117,6 +133,9 @@ main
 
 .general-settings-panel
     position: absolute
+    display: flex
+    flex-direction: column
+    padding: 15px
     right: 0
     top: 10vh
     width: 300px
@@ -125,7 +144,11 @@ main
     box-shadow: 0 4px 14px rgba(0,0,0,0.12)
     border: 1px solid rgba(0,0,0,0.06)
     border-radius: 15px 0 0 15px
+    transition: .3s
     z-index: 9999
+    &:hover
+        transition: .3s
+        background-color: #EDF3FA
 
 .collapsed-panel
     position: absolute
@@ -142,8 +165,10 @@ main
     background-color: #F5F8FC
     box-shadow: 0 4px 14px rgba(0,0,0,0.12)
     border: 1px solid rgba(0,0,0,0.06)
+    transition: .3s
     z-index: 9999
     &:hover
+        transition: .3s
         background-color: #EDF3FA
     &__sticker
         width: 40px
@@ -152,9 +177,6 @@ main
         &:hover
             transition: .3s
             transform: translateY(-5px)
-
-
-
 
 footer
     text-align: center

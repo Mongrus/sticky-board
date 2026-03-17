@@ -1,21 +1,37 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { STICKER_COLORS } from '@/constants/sticker.constants';
 
 export const useMainStore = defineStore('stickers', () => {
     
     const stickers = ref([]);
     const nextId = ref(1);
     const settings = ref({
-        width: 300,
-        height: 180,
-        backgroundColor: 'black',
+        width: 200,
+        height: 120,
+        backgroundColor: 'color',
         font: 'Roboto, sans-serif',
+        textColor: 'black',
         fontSize: 14
     });
 
-    function createSticker(id, text, folded, x, y, w, h, bc, font, fs, z) {
+    function getDefaultColor() {
+
+    if (settings.value.backgroundColor === 'color') {
+        return STICKER_COLORS[
+            Math.floor(Math.random() * STICKER_COLORS.length)
+        ].value
+    }
+        return settings.value.backgroundColor
+    }
+
+    function getTextColor(bg) {
+        return bg === 'black' ? 'white' : 'black'
+    }
+
+    function createSticker(id, text, folded, x, y, w, h, bc, font, fs, tc, z) {
         nextId.value++;
-        stickers.value.push({id, text, folded, x, y, w, h, bc, font, fs, z});
+        stickers.value.push({id, text, folded, x, y, w, h, bc, font, fs, tc, z});
     }
 
     function setPositionSticker(id, x, y) {
@@ -63,6 +79,8 @@ export const useMainStore = defineStore('stickers', () => {
         stickers,
         settings,
         nextId,
+        getTextColor,
+        getDefaultColor,
         createSticker,
         setPositionSticker,
         setSizeSticker,

@@ -175,11 +175,11 @@ function changingStickerSettings() {
     <div
         class="sticker"
         :style="{
-            width: sticker.w + 'px',
-            height: sticker.h + 'px',
-            left: sticker.x + 'px',
-            top: sticker.y + 'px',
-            zIndex: sticker.z
+        left: (!settingsSticker ? sticker.x : sticker.x + (sticker.w - 320) / 2) + 'px',
+        top: (!settingsSticker ? sticker.y : sticker.y + (sticker.h - 210) / 2) + 'px',
+        zIndex: sticker.z,
+        width: !settingsSticker ? sticker.w + 'px' : '320px',
+        height: !settingsSticker ? sticker.h + 'px' : '210px'
         }"
         @pointerdown="moveSticker($event, sticker.id)"
         >
@@ -188,7 +188,8 @@ function changingStickerSettings() {
             :style="{
                 backgroundColor: sticker.bc,
                 fontFamily: sticker.font,
-                fontSize: sticker.fs + 'px'
+                fontSize: sticker.fs + 'px',
+                color: store.getTextColor(sticker.bc)
             }"
             v-model="sticker.text"
             ></textarea>
@@ -203,6 +204,18 @@ function changingStickerSettings() {
                         :class="{ active: sticker.bc === color.value }"
                         @pointerdown.stop @click="sticker.bc = color.value"
                     ></button>
+                    <button
+                        class="color-palette__color"
+                        :style="{ backgroundColor: 'black' }"
+                        :class="{ active: sticker.bc === 'black' }"
+                        @pointerdown.stop @click="sticker.bc = 'black'"
+                    ></button>
+                    <button
+                        class="color-palette__color"
+                        :style="{ backgroundColor: 'snow' }"
+                        :class="{ active: sticker.bc === 'snow' }"
+                        @pointerdown.stop @click="sticker.bc = 'snow'"
+                    ></button>
                 </div>
                 <label>Шрифт:</label>
                 <select v-model="sticker.font">
@@ -211,9 +224,9 @@ function changingStickerSettings() {
                 <label>Размер шрифта:</label>
                 <input type="number" v-model="sticker.fs">
             </div>
-        <div class="resize resize__resize-lt"@pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
-        <div class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
-        <div class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
+        <div v-if="!settingsSticker" class="resize resize__resize-lt"@pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
+        <div v-if="!settingsSticker" class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
+        <div v-if="!settingsSticker" class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
         <div class="sticker__id">
             <pre>№{{ sticker.id }}</pre>
         </div>
@@ -250,8 +263,8 @@ function changingStickerSettings() {
     transform: translateZ(0)
     touch-action: none
     user-select: none
-    min-width: 300px
-    min-height: 140px
+    min-width: 100px
+    min-height: 50px
     &:hover .sticker__id
         opacity: .1
         transition: .3s
@@ -301,23 +314,23 @@ function changingStickerSettings() {
     button:active
         transform: scale(.9)
     &__btn-settings
-        color: gray
+        color: #7A8798
         &:hover
             color: white
-            background-color: gray
+            background-color: #7A8798
         &.active
             color: white
-            background-color: gray
+            background-color: #7A8798
     &__btn-collapse
-        color: green    
+        color: #5C9CFF
         &:hover
             color: white
-            background-color: green
+            background-color: #5C9CFF
     &__btn-delete
-        color: red
+        color: #E06A6A
         &:hover
             color: white
-            background-color: red
+            background-color: #E06A6A
 
 
 .resize
@@ -367,6 +380,5 @@ function changingStickerSettings() {
         &:hover
             transform: scale(1.15)
         &.active
-            border: 3px solid crimson
-
+            border: 3px solid #5C9CFF
 </style>
