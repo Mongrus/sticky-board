@@ -206,9 +206,9 @@ function changingStickerSettings() {
                     ></button>
                     <button
                         class="color-palette__color"
-                        :style="{ backgroundColor: 'black' }"
-                        :class="{ active: sticker.bc === 'black' }"
-                        @pointerdown.stop @click="sticker.bc = 'black'"
+                        :style="{ backgroundColor: '#2B2B2B' }"
+                        :class="{ active: sticker.bc === '#2B2B2B' }"
+                        @pointerdown.stop @click="sticker.bc = '#2B2B2B'"
                     ></button>
                     <button
                         class="color-palette__color"
@@ -227,7 +227,7 @@ function changingStickerSettings() {
         <div v-if="!settingsSticker" class="resize resize__resize-lt"@pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
         <div v-if="!settingsSticker" class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
         <div v-if="!settingsSticker" class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
-        <div class="sticker__id">
+        <div class="sticker__id" :style="{color: store.getTextColor(sticker.bc)}">
             <pre>№{{ sticker.id }}</pre>
         </div>
         <div class="sticker-menu">
@@ -268,6 +268,11 @@ function changingStickerSettings() {
     &:hover .sticker__id
         opacity: .1
         transition: .3s
+    &:hover .resize
+        opacity: .5
+        &:hover
+            opacity: 1
+            cursor: pointer
     &__id
         position: absolute
         right: 0
@@ -275,9 +280,8 @@ function changingStickerSettings() {
         font-size: 25px
         padding: 3px
         opacity: .08
-        font-weight: bold
-        pointer-events: none
         transition: .3s
+        pointer-events: none
         opacity: 0
     
 .content
@@ -302,10 +306,12 @@ function changingStickerSettings() {
     top: -22px
     right: 0
     button
+        display: flex
+        align-items: center
+        justify-content: center
         background-color: #f5f5f5
         border: none
         padding: 0
-        text-align: center
         border-radius: 100%
         font-size: 12px
         width: 18px
@@ -339,10 +345,7 @@ function changingStickerSettings() {
     height: 14px
     border: 1px solid black
     background-color: white
-    opacity: 0.5
-    &:hover
-        opacity: 1
-        cursor: pointer
+    opacity: 0
     &__resize-lt
         left: -2px
         top: -2px

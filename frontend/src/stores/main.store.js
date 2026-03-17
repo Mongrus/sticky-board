@@ -4,6 +4,7 @@ import { STICKER_COLORS } from '@/constants/sticker.constants';
 
 export const useMainStore = defineStore('stickers', () => {
     
+    const stage = ref('welcome');
     const stickers = ref([]);
     const nextId = ref(1);
     const settings = ref({
@@ -26,7 +27,7 @@ export const useMainStore = defineStore('stickers', () => {
     }
 
     function getTextColor(bg) {
-        return bg === 'black' ? 'white' : 'black'
+        return bg === '#2B2B2B' ? 'white' : '#2B2B2B'
     }
 
     function createSticker(id, text, folded, x, y, w, h, bc, font, fs, tc, z) {
@@ -76,6 +77,7 @@ export const useMainStore = defineStore('stickers', () => {
     }
 
     return {
+        stage,
         stickers,
         settings,
         nextId,
