@@ -5,6 +5,8 @@ import CollapsedPanel from '@/components/board/CollapsedPanel.vue';
 import SettingsPanel from '@/components/board/SettingsPanel.vue';
 import Toolbar from '@/components/board/Toolbar.vue';
 import { useMainStore } from '../stores/main.store';
+import CookieModal from '@/components/modals/CookieModal.vue';
+import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 
 const store = useMainStore();
 const activeGeneralSettings = ref(false);
@@ -12,7 +14,7 @@ const activeGeneralSettings = ref(false);
 </script>
 
 <template>
-  <main>
+    <main>
             <div class="board">
               <Sticker v-for="sticker in store.stickers.filter(s => !s.folded)" :sticker="sticker" :key="sticker.id"/>
             </div>
@@ -25,7 +27,28 @@ const activeGeneralSettings = ref(false);
                 :activeGeneralSettings="activeGeneralSettings"
                 @toggleSettings="activeGeneralSettings = !activeGeneralSettings"
             />
-    </main>
+
+        </main>
+        
+        <CookieModal v-if="!store.cookiesConfirmed"/>
+
+        <ConfirmModal
+            v-if="store.confirmDeleteStickerId"
+            title="Удалить стикер?"
+            text="Это действие нельзя отменить."
+            confirmText="Удалить"
+            @cancel="store.confirmDeleteStickerId = false"
+            @confirm="store.destroySticker(store.confirmDeleteStickerId)"
+        />
+
+        <ConfirmModal
+            v-if="store.confirmClearBoard"
+            title="Очистить доску?"
+            text="Все стикеры будут удалены."
+            confirmText="Очистить"
+            @cancel="store.confirmClearBoard = false"
+            @confirm="store.clearBoard()"
+        />
 </template>
 
 <style lang="sass">

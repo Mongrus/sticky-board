@@ -2,6 +2,7 @@
 import { useMainStore } from '@/stores/main.store'
 import { useRouter } from 'vue-router'
 import { onMounted } from 'vue'
+import CookieModal from '@/components/modals/CookieModal.vue'
 
 const store = useMainStore()
 const router = useRouter()
@@ -14,36 +15,30 @@ onMounted(() => {
 </script>
 
 <template>
-
-<div class="welcome">
-
-<div class="welcome__content">
-
-<h1>Онлайн Стикеры</h1>
-
-<p>
-Простая онлайн-доска для заметок и идей.
-Создавайте стикеры, перемещайте их по рабочему пространству
-и организуйте мысли в удобном визуальном формате.
-</p>
-
-<RouterLink
-class="welcome__btn"
-@click="store.stage = 'app'"
-to="/board"
->
-Начать работу
-</RouterLink>
-
-</div>
-
-</div>
-
+    <div class="welcome">
+        <div class="welcome__content">
+            <h1>Онлайн Стикеры</h1>
+            <p>
+            Простая онлайн-доска для заметок и идей.
+            Создавайте стикеры, перемещайте их по рабочему пространству
+            и организуйте мысли в удобном визуальном формате.
+            </p>
+            <RouterLink
+            class="welcome__btn"
+            @click="store.stage = 'app'"
+            to="/board"
+            >
+            Начать работу
+            </RouterLink>
+        </div>
+        <CookieModal v-if="!store.cookiesConfirmed"/>
+    </div>
 </template>
 
 <style scoped lang="sass">
 
 .welcome
+    position: relative
     display: flex
     align-items: center
     justify-content: center

@@ -29,7 +29,7 @@ const store = useMainStore();
             store.getTextColor(store.getDefaultColor()), // Цвет текста
             Math.max(...store.stickers.map(s => s.z), 0) // z-index
             )">Создать +</button>
-        <button class="toolbar__btn-clear" @click="store.clearBoard()">Очистить</button>
+        <button class="toolbar__btn-clear" @click="store.confirmClearBoard = true">Очистить</button>
         <button
             class="toolbar__btn-settings"
             :class="{ active: activeGeneralSettings }"

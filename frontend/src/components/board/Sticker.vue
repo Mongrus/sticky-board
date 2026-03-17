@@ -246,7 +246,7 @@ function changingStickerSettings() {
 
             <button 
             @pointerdown.stop 
-            @click="store.destroySticker(sticker.id)"
+            @click="store.confirmDeleteStickerId = sticker.id"
             class="sticker-menu__btn-delete"
             >X</button>
         </div>
@@ -296,6 +296,13 @@ function changingStickerSettings() {
     box-sizing: border-box
     &:active
         cursor: grabbing
+    &::-webkit-scrollbar
+        width: 5px
+    &::-webkit-scrollbar-thumb
+        background: rgba(0,0,0,0.25)
+        border-radius: 10px
+    &::-webkit-scrollbar-track
+        background: transparent
 
 .sticker-menu
     position: absolute
@@ -370,7 +377,6 @@ function changingStickerSettings() {
 
 .color-palette
     display: flex
-    flex-direction: row
     flex-wrap: wrap
     gap: 6px
     &__color

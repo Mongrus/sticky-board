@@ -7,6 +7,9 @@ export const useMainStore = defineStore('stickers', () => {
     const stage = ref('welcome');
     const stickers = ref([]);
     const nextId = ref(1);
+    const cookiesConfirmed = ref(false);
+    const confirmDeleteStickerId = ref(null);
+    const confirmClearBoard = ref(false);
     const settings = ref({
         width: 200,
         height: 120,
@@ -69,11 +72,13 @@ export const useMainStore = defineStore('stickers', () => {
 
     function destroySticker(id) {
         stickers.value = stickers.value.filter(s => s.id !== id)
+        confirmDeleteStickerId.value = null
     }
 
     function clearBoard() {
         nextId.value = 1;
         stickers.value = [];
+        confirmClearBoard.value = false
     }
 
     return {
@@ -81,6 +86,9 @@ export const useMainStore = defineStore('stickers', () => {
         stickers,
         settings,
         nextId,
+        cookiesConfirmed,
+        confirmDeleteStickerId,
+        confirmClearBoard,
         getTextColor,
         getDefaultColor,
         createSticker,
