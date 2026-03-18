@@ -1,16 +1,24 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useMainStore } from '../stores/main.store';
 import Sticker from '../components/board/Sticker.vue';
 import CollapsedPanel from '@/components/board/CollapsedPanel.vue';
 import SettingsPanel from '@/components/board/SettingsPanel.vue';
 import Toolbar from '@/components/board/Toolbar.vue';
-import { useMainStore } from '../stores/main.store';
 import CookieModal from '@/components/modals/CookieModal.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 
 const store = useMainStore();
+const router = useRouter();
 const activeGeneralSettings = ref(false);
 
+onMounted(() => {
+  const visited = localStorage.getItem('welcome-shown');
+  if (!visited) {
+    router.replace('/');
+  }
+});
 </script>
 
 <template>

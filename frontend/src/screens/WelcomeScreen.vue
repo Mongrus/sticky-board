@@ -8,10 +8,16 @@ const store = useMainStore()
 const router = useRouter()
 
 onMounted(() => {
-  if (store.stage === 'app') {
+  const visited = localStorage.getItem('welcome-shown')
+  if (visited) {
     router.replace('/board')
   }
 })
+
+function startWork() {
+  localStorage.setItem('welcome-shown', 'true')
+  router.push('/board')
+}
 </script>
 
 <template>
@@ -25,7 +31,7 @@ onMounted(() => {
             </p>
             <RouterLink
             class="welcome__btn"
-            @click="store.stage = 'app'"
+            @click="startWork()"
             to="/board"
             >
             Начать работу

@@ -1,7 +1,7 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
 import { STICKER, STICKER_COLORS, STICKER_FONTS } from '@/constants/sticker.constants';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const store = useMainStore();
 const settingsSticker = ref(false);
@@ -9,6 +9,34 @@ const settingsSticker = ref(false);
 const {sticker} = defineProps({
     sticker: Object
 })
+
+const localText = ref(sticker.text);
+const localFont = ref(sticker.font);
+const localFontSize = ref(sticker.fs);
+
+watch(() => sticker.text, (newVal) => {
+    localText.value = newVal;
+});
+
+watch(() => sticker.font, (newVal) => {
+    localFont.value = newVal;
+});
+
+watch(() => sticker.fs, (newVal) => {
+    localFontSize.value = newVal;
+});
+
+function updateText() {
+    sticker.text = localText.value;
+}
+
+function updateFont() {
+    sticker.font = localFont.value;
+}
+
+function updateFontSize() {
+    sticker.fs = localFontSize.value;
+}
 
 let resizing = false
 
@@ -191,7 +219,8 @@ function changingStickerSettings() {
                 fontSize: sticker.fs + 'px',
                 color: store.getTextColor(sticker.bc)
             }"
-            v-model="sticker.text"
+            v-model="localText"
+            @blur="updateText"
             ></textarea>
             <div v-else class="settings-sticker">
                 <label>Цвет фона:</label>
@@ -218,17 +247,17 @@ function changingStickerSettings() {
                     ></button>
                 </div>
                 <label>Шрифт:</label>
-                <select v-model="sticker.font">
+                <select v-model="localFont" @change="updateFont">
                         <option v-for="font in STICKER_FONTS" :value="font.value">{{ font.label }}</option>
                 </select>
                 <label>Размер шрифта:</label>
-                <input type="number" v-model="sticker.fs">
+                <input type="number" v-model="localFontSize" @blur="updateFontSize">
             </div>
         <div v-if="!settingsSticker" class="resize resize__resize-lt"@pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
         <div v-if="!settingsSticker" class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
         <div v-if="!settingsSticker" class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
         <div class="sticker__id" :style="{color: store.getTextColor(sticker.bc)}">
-            <pre>№{{ sticker.id }}</pre>
+            <p>№{{ sticker.id }}</p>
         </div>
         <div class="sticker-menu">
             <button 

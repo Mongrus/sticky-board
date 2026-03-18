@@ -6,18 +6,20 @@ const store = useMainStore();
 </script>
 
 <template>
-    <div class="collapsed-panel" v-if="store.stickers.some(s => s.folded)">
-        <div class="collapsed-panel__container">
-            <button 
-                class="collapsed-panel__sticker" 
-                v-for="sticker in store.stickers.filter(s => s.folded)" 
-                :style="{ backgroundColor: sticker.bc, color: store.getTextColor(sticker.bc) }"
-                @click="store.setFoldedSticker(sticker.id)"
-                >
-                <p>№{{ sticker.id }}</p>
-            </button>
+    <Transition name="slide-in-left">
+        <div class="collapsed-panel" v-show="store.stickers.some(s => s.folded)">
+            <div class="collapsed-panel__container">
+                <button 
+                    class="collapsed-panel__sticker" 
+                    v-for="sticker in store.stickers.filter(s => s.folded)" 
+                    :style="{ backgroundColor: sticker.bc, color: store.getTextColor(sticker.bc) }"
+                    @click="store.setFoldedSticker(sticker.id)"
+                    >
+                    <p>№{{ sticker.id }}</p>
+                </button>
+            </div>
         </div>
-    </div>
+    </Transition>
 </template>
 
 <style lang="sass" scoped>
@@ -66,5 +68,16 @@ const store = useMainStore();
         transition: .2s
         &:hover
             transform: translateY(-3px)
+        p
+            opacity: .7
+
+.slide-in-left-enter-active,
+.slide-in-left-leave-active
+    transition: all 0.3s ease
+
+.slide-in-left-enter-from,
+.slide-in-left-leave-to
+    opacity: 0
+    transform: translateX(-100%)
 
 </style>

@@ -4,7 +4,6 @@ import { STICKER_COLORS } from '@/constants/sticker.constants';
 
 export const useMainStore = defineStore('stickers', () => {
     
-    const stage = ref('welcome');
     const stickers = ref([]);
     const nextId = ref(1);
     const cookiesConfirmed = ref(false);
@@ -81,8 +80,20 @@ export const useMainStore = defineStore('stickers', () => {
         confirmClearBoard.value = false
     }
 
+    if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('stickers-store')
+
+    if (saved) {
+        const data = JSON.parse(saved)
+
+        stickers.value = data.stickers || []
+        nextId.value = data.nextId || 1
+        settings.value = data.settings || settings.value
+        cookiesConfirmed.value = data.cookiesConfirmed || false
+    }
+    }
+
     return {
-        stage,
         stickers,
         settings,
         nextId,
