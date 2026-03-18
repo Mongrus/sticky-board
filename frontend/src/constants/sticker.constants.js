@@ -1,7 +1,7 @@
 export const STICKER = {
   MIN_WIDTH: 100,
   MIN_HEIGHT: 50,
-  DEFAULT_FONT: 'Roboto, sans-serif'
+  DEFAULT_FONT: 'Andika, sans-serif'
 }
 
 export const STICKER_COLORS = [
@@ -31,6 +31,7 @@ export const STICKER_COLORS = [
 ]
 
 export const STICKER_FONTS = [
+    { label: 'Andika', value: 'Andika, sans-serif' },
     { label: 'Inter', value: 'Inter, sans-serif' },
     { label: 'Roboto', value: 'Roboto, sans-serif' },
     { label: 'Open Sans', value: '"Open Sans", sans-serif' },

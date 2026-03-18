@@ -7,7 +7,8 @@ export const useMainStore = defineStore('stickers', () => {
     const stickers = ref([]);
     const nextId = ref(1);
     const cookiesConfirmed = ref(false);
-    const confirmDeleteStickerId = ref(null);
+    const deletedSticker = ref(null);
+    const deleteRestoreTimer = ref(null);
     const confirmClearBoard = ref(false);
     const settings = ref({
         width: 200,
@@ -69,9 +70,28 @@ export const useMainStore = defineStore('stickers', () => {
     sticker.z = maxZ + 1
     }
 
+    function deleteSticker(id) {
+        const sticker = stickers.value.find(s => s.id === id)
+        if (!sticker) return
+        if (deleteRestoreTimer.value) clearTimeout(deleteRestoreTimer.value)
+        deletedSticker.value = { ...sticker }
+        stickers.value = stickers.value.filter(s => s.id !== id)
+        deleteRestoreTimer.value = setTimeout(() => {
+            deletedSticker.value = null
+            deleteRestoreTimer.value = null
+        }, 7000)
+    }
+
+    function restoreSticker() {
+        if (!deletedSticker.value) return
+        if (deleteRestoreTimer.value) clearTimeout(deleteRestoreTimer.value)
+        stickers.value.push(deletedSticker.value)
+        deletedSticker.value = null
+        deleteRestoreTimer.value = null
+    }
+
     function destroySticker(id) {
         stickers.value = stickers.value.filter(s => s.id !== id)
-        confirmDeleteStickerId.value = null
     }
 
     function clearBoard() {
@@ -98,7 +118,7 @@ export const useMainStore = defineStore('stickers', () => {
         settings,
         nextId,
         cookiesConfirmed,
-        confirmDeleteStickerId,
+        deletedSticker,
         confirmClearBoard,
         getTextColor,
         getDefaultColor,
@@ -107,6 +127,8 @@ export const useMainStore = defineStore('stickers', () => {
         setSizeSticker,
         setFoldedSticker,
         bringToFront,
+        deleteSticker,
+        restoreSticker,
         destroySticker,
         clearBoard
     }

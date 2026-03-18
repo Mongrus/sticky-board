@@ -8,6 +8,7 @@ import SettingsPanel from '@/components/board/SettingsPanel.vue';
 import Toolbar from '@/components/board/Toolbar.vue';
 import CookieModal from '@/components/modals/CookieModal.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
+import RestoreToast from '@/components/modals/RestoreToast.vue';
 
 const store = useMainStore();
 const router = useRouter();
@@ -19,11 +20,31 @@ onMounted(() => {
     router.replace('/');
   }
 });
+
+function createStickerOnDoubleClick(event) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  store.createSticker(
+    store.nextId,
+    '',
+    false,
+    x,
+    y,
+    store.settings.width,
+    store.settings.height,
+    store.getDefaultColor(),
+    store.settings.font,
+    store.settings.fontSize,
+    store.getTextColor(store.getDefaultColor()),
+    Math.max(...store.stickers.map(s => s.z), 0)
+  );
+}
 </script>
 
 <template>
     <main>
-            <div class="board">
+            <div class="board" @dblclick="createStickerOnDoubleClick">
               <Sticker v-for="sticker in store.stickers.filter(s => !s.folded)" :sticker="sticker" :key="sticker.id"/>
             </div>
             
@@ -40,14 +61,7 @@ onMounted(() => {
         
         <CookieModal v-if="!store.cookiesConfirmed"/>
 
-        <ConfirmModal
-            v-if="store.confirmDeleteStickerId"
-            title="Удалить стикер?"
-            text="Это действие нельзя отменить."
-            confirmText="Удалить"
-            @cancel="store.confirmDeleteStickerId = false"
-            @confirm="store.destroySticker(store.confirmDeleteStickerId)"
-        />
+        <RestoreToast />
 
         <ConfirmModal
             v-if="store.confirmClearBoard"

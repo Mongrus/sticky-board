@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+const baseTitle = 'Онлайн Стикеры'
+
 import WelcomeScreen from '@/screens/WelcomeScreen.vue'
 import BoardApp from '../screens/BoardApp.vue'
 import PrivacyPolicy from '../screens/PrivacyPolicy.vue'

@@ -20,6 +20,7 @@ img, picture, video, canvas {
 
 input, button, textarea, select {
   font: inherit;
+  cursor: pointer;
 }
 
 a {

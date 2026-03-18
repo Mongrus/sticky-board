@@ -221,6 +221,9 @@ function changingStickerSettings() {
             }"
             v-model="localText"
             @blur="updateText"
+            spellcheck="false"
+            autocorrect="off"
+            autocomplete="off"
             ></textarea>
             <div v-else class="settings-sticker">
                 <label>Цвет фона:</label>
@@ -275,7 +278,7 @@ function changingStickerSettings() {
 
             <button 
             @pointerdown.stop 
-            @click="store.confirmDeleteStickerId = sticker.id"
+            @click="store.deleteSticker(sticker.id)"
             class="sticker-menu__btn-delete"
             >X</button>
         </div>
