@@ -1,7 +1,7 @@
 <script setup>
 import { STICKER } from '../../constants/sticker.constants'
 import { useMainStore } from '@/stores/main.store';
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 
 defineProps({
     activeGeneralSettings: Boolean
@@ -12,49 +12,90 @@ const emit = defineEmits(['toggleSettings'])
 const store = useMainStore();
 
 const toolbarPosition = ref({ x: window.innerWidth - 200, y: 10 });
-let isDragging = false;
+const toolbarRef = ref(null);
+
+function getToolbarWidth() {
+    return toolbarRef.value?.offsetWidth ?? 180;
+}
+
+const EDGE_MARGIN = 4;
+
+function clampPosition(pos) {
+    const width = getToolbarWidth();
+    const maxX = Math.max(0, window.innerWidth - width - EDGE_MARGIN);
+    return {
+        x: Math.max(EDGE_MARGIN, Math.min(maxX, pos.x)),
+        y: pos.y
+    };
+}
+
+function handleResize() {
+    toolbarPosition.value = clampPosition(toolbarPosition.value);
+}
 
 onMounted(() => {
     const saved = localStorage.getItem('toolbar-position');
-    if (saved) {
-        toolbarPosition.value = JSON.parse(saved);
-    } else {
-        toolbarPosition.value.x = (window.innerWidth - 160) / 2;
-        toolbarPosition.value.y = 10;
-    }
+    const applyPosition = () => {
+        if (saved) {
+            toolbarPosition.value = clampPosition(JSON.parse(saved));
+        } else {
+            const width = getToolbarWidth();
+            toolbarPosition.value = { x: Math.max(0, (window.innerWidth - width) / 2), y: 10 };
+        }
+    };
+    requestAnimationFrame(applyPosition);
+    window.addEventListener('resize', handleResize);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('resize', handleResize);
 });
 
 watch(toolbarPosition, (newPos) => {
-    localStorage.setItem('toolbar-position', JSON.stringify(newPos));
+    const clamped = clampPosition(newPos);
+    localStorage.setItem('toolbar-position', JSON.stringify(clamped));
 }, { deep: true });
 
-function startDrag(e) {
-    if (e.target.tagName === 'BUTTON') return;
-    isDragging = true;
-    const el = e.currentTarget;
-    el.setPointerCapture(e.pointerId);
-    document.body.style.cursor = 'grabbing';
+const DRAG_THRESHOLD = 10;
 
+function startDrag(e) {
+    const el = e.currentTarget;
+    const initialTarget = e.target;
     const startX = e.clientX;
     const startY = e.clientY;
     const initialX = toolbarPosition.value.x;
-    const initialY = toolbarPosition.value.y;
-
     let dx = 0;
+    let moved = false;
+
+    el.setPointerCapture(e.pointerId);
+    if (typeof document.body.style.cursor !== 'undefined') {
+        document.body.style.cursor = 'grabbing';
+    }
 
     const move = (ev) => {
         dx = ev.clientX - startX;
-        const newX = Math.max(0, Math.min(window.innerWidth - 160, initialX + dx));
+        const dy = ev.clientY - startY;
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+            moved = true;
+        }
+        const maxX = Math.max(0, window.innerWidth - getToolbarWidth() - EDGE_MARGIN);
+        const newX = Math.max(EDGE_MARGIN, Math.min(maxX, initialX + dx));
         el.style.transform = `translate(${newX}px, ${toolbarPosition.value.y}px)`;
     };
 
     const stop = (ev) => {
-        isDragging = false;
-        document.body.style.cursor = '';
         if (el.hasPointerCapture(ev.pointerId)) {
             el.releasePointerCapture(ev.pointerId);
         }
-        toolbarPosition.value.x = Math.max(0, Math.min(window.innerWidth - 160, initialX + dx));
+        if (typeof document.body.style.cursor !== 'undefined') {
+            document.body.style.cursor = '';
+        }
+        if (moved) {
+            toolbarPosition.value = clampPosition({ ...toolbarPosition.value, x: initialX + dx });
+        } else {
+            const btn = initialTarget.closest('button');
+            if (btn) btn.click();
+        }
         el.style.transform = `translate(${toolbarPosition.value.x}px, ${toolbarPosition.value.y}px)`;
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', stop);
@@ -68,7 +109,7 @@ function startDrag(e) {
 </script>
 
 <template>
-    <div class="toolbar" @pointerdown="startDrag" :style="{ left: '0px', top: '0px', transform: `translate(${toolbarPosition.x}px, ${toolbarPosition.y}px)` }">
+    <div ref="toolbarRef" class="toolbar" @pointerdown="startDrag" :style="{ left: '0px', top: '0px', transform: `translate(${toolbarPosition.x}px, ${toolbarPosition.y}px)` }">
         <button 
             class="toolbar__btn-create"
             @click="store.createSticker(
@@ -112,6 +153,7 @@ function startDrag(e) {
     cursor: grab
     will-change: transform
     user-select: none
+    touch-action: none
     &:hover
         background-color: #EDF3FA
     &:active

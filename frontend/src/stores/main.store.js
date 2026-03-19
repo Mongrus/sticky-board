@@ -7,8 +7,7 @@ export const useMainStore = defineStore('stickers', () => {
     const stickers = ref([]);
     const nextId = ref(1);
     const cookiesConfirmed = ref(false);
-    const deletedSticker = ref(null);
-    const deleteRestoreTimer = ref(null);
+    const deletedStickers = ref([]);
     const confirmClearBoard = ref(false);
     const settings = ref({
         width: 200,
@@ -73,21 +72,20 @@ export const useMainStore = defineStore('stickers', () => {
     function deleteSticker(id) {
         const sticker = stickers.value.find(s => s.id === id)
         if (!sticker) return
-        if (deleteRestoreTimer.value) clearTimeout(deleteRestoreTimer.value)
-        deletedSticker.value = { ...sticker }
+        const stickerCopy = { ...sticker }
         stickers.value = stickers.value.filter(s => s.id !== id)
-        deleteRestoreTimer.value = setTimeout(() => {
-            deletedSticker.value = null
-            deleteRestoreTimer.value = null
+        const timerId = setTimeout(() => {
+            deletedStickers.value = deletedStickers.value.filter(item => item.sticker.id !== id)
         }, 7000)
+        deletedStickers.value.push({ sticker: stickerCopy, timerId })
     }
 
-    function restoreSticker() {
-        if (!deletedSticker.value) return
-        if (deleteRestoreTimer.value) clearTimeout(deleteRestoreTimer.value)
-        stickers.value.push(deletedSticker.value)
-        deletedSticker.value = null
-        deleteRestoreTimer.value = null
+    function restoreSticker(id) {
+        const item = deletedStickers.value.find(i => i.sticker.id === id)
+        if (!item) return
+        clearTimeout(item.timerId)
+        stickers.value.push(item.sticker)
+        deletedStickers.value = deletedStickers.value.filter(i => i.sticker.id !== id)
     }
 
     function destroySticker(id) {
@@ -118,7 +116,7 @@ export const useMainStore = defineStore('stickers', () => {
         settings,
         nextId,
         cookiesConfirmed,
-        deletedSticker,
+        deletedStickers,
         confirmClearBoard,
         getTextColor,
         getDefaultColor,

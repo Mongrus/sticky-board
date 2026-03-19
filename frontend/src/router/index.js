@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { WELCOME_STORAGE_KEY } from '@/constants/app.constants'
+import WelcomeScreen from '@/screens/WelcomeScreen.vue'
 
 const baseTitle = 'Онлайн Стикеры'
-
-import WelcomeScreen from '@/screens/WelcomeScreen.vue'
 import BoardApp from '../screens/BoardApp.vue'
 import PrivacyPolicy from '../screens/PrivacyPolicy.vue'
 
@@ -13,6 +13,17 @@ const router = createRouter({
     { path: '/board', component: BoardApp, meta: { title: 'Доска стикеров' } },
     { path: '/privacy', component: PrivacyPolicy, meta: { title: 'Политика конфиденциальности' } }
   ]
+})
+
+router.beforeEach((to, from, next) => {
+  const visited = localStorage.getItem(WELCOME_STORAGE_KEY)
+  if (to.path === '/' && visited) {
+    next('/board')
+  } else if (to.path === '/board' && !visited) {
+    next('/')
+  } else {
+    next()
+  }
 })
 
 router.afterEach((to) => {

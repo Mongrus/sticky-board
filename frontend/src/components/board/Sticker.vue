@@ -72,12 +72,16 @@ function moveSticker(e, id) {
     let dx = 0
     let dy = 0
 
+    let rafId = null
     const move = (ev) => {
-
         dx = ev.clientX - startX
         dy = ev.clientY - startY
-
-        el.style.transform = `translate(${dx}px, ${dy}px)`
+        if (rafId === null) {
+            rafId = requestAnimationFrame(() => {
+                el.style.transform = `translate(${dx}px, ${dy}px) translateZ(0)`
+                rafId = null
+            })
+        }
     }
 
     const stop = (ev) => {
@@ -87,6 +91,10 @@ function moveSticker(e, id) {
         if (el.hasPointerCapture(ev.pointerId)) {
             el.releasePointerCapture(ev.pointerId)
         }
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId)
+            rafId = null
+        }
 
         store.setPositionSticker(
             id,
@@ -94,7 +102,7 @@ function moveSticker(e, id) {
             sticker.y + dy
         )
 
-        el.style.transform = ''
+        el.style.transform = 'translateZ(0)'
 
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', stop)
@@ -180,7 +188,7 @@ function resizeSticker(e, id, corner) {
         finalY = y
 
         el.style.transform =
-        `translate(${x - startLeft}px, ${y - startTop}px)`
+        `translate(${x - startLeft}px, ${y - startTop}px) translateZ(0)`
 
         el.style.width = w + 'px'
         el.style.height = h + 'px'
@@ -194,7 +202,7 @@ function resizeSticker(e, id, corner) {
             el.releasePointerCapture(ev.pointerId)
         }
 
-        el.style.transform = ''
+        el.style.transform = 'translateZ(0)'
 
         store.setSizeSticker(id, finalW, finalH, finalX, finalY)
 
@@ -208,8 +216,8 @@ function resizeSticker(e, id, corner) {
     window.addEventListener('pointercancel', stop)
 }
 
-const POPOVER_WIDTH = 312;
-const POPOVER_HEIGHT = 270;
+const POPOVER_WIDTH = 340;
+const POPOVER_HEIGHT = 280;
 const MARGIN = 8;
 
 function changingStickerSettings() {
@@ -449,29 +457,39 @@ function changingStickerSettings() {
 .sticker-settings-popover
     position: fixed
     z-index: 10002
-    width: 312px
-    max-height: 270px
+    width: 340px
+    height: 280px
+    box-sizing: border-box
+    overflow: hidden
 
 .sticker-settings-popover__inner
     display: flex
     flex-direction: column
     gap: 8px
     padding: 16px
+    width: 100%
+    height: 100%
+    box-sizing: border-box
     background: #F5F8FC
     border-radius: 12px
     box-shadow: 0 8px 24px rgba(0,0,0,0.15)
     border: 1px solid rgba(0,0,0,0.06)
+    overflow-x: hidden
     overflow-y: auto
-    max-height: 270px
+    flex-shrink: 0
     label
         font-size: 12px
         font-weight: 500
         color: #555
+        flex-shrink: 0
     select, input
         padding: 8px 10px
         border: 1px solid #ddd
         border-radius: 8px
         font-size: 14px
+        width: 100%
+        box-sizing: border-box
+        flex-shrink: 0
 
 .popover-enter-active,
 .popover-leave-active
@@ -487,6 +505,7 @@ function changingStickerSettings() {
     flex-wrap: wrap
     gap: 6px
     width: 280px
+    flex-shrink: 0
     &__color
         width: 20px
         height: 20px

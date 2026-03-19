@@ -15,13 +15,24 @@ app.use(router)
 
 const store = useMainStore()
 
-store.$subscribe((_, state) => {
+let persistTimeout = null
+function persistStore(state) {
   localStorage.setItem('stickers-store', JSON.stringify({
     stickers: state.stickers,
     nextId: state.nextId,
     settings: state.settings,
     cookiesConfirmed: state.cookiesConfirmed
   }))
+}
+
+store.$subscribe((_, state) => {
+  clearTimeout(persistTimeout)
+  persistTimeout = setTimeout(() => persistStore(state), 200)
+})
+
+window.addEventListener('pagehide', () => {
+  clearTimeout(persistTimeout)
+  persistStore(store.$state)
 })
 
 app.mount('#app')

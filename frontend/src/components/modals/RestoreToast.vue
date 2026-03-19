@@ -5,22 +5,35 @@ const store = useMainStore()
 </script>
 
 <template>
-    <Transition name="toast">
-        <div v-if="store.deletedSticker" class="restore-toast">
-            <span class="restore-toast__text">Стикер №{{ store.deletedSticker.id }} удалён</span>
-            <button class="restore-toast__btn" @click="store.restoreSticker()">
-                Восстановить
-            </button>
-        </div>
-    </Transition>
+    <div v-if="store.deletedStickers.length" class="restore-toasts">
+        <TransitionGroup name="toast">
+            <div
+                v-for="item in store.deletedStickers"
+                :key="item.sticker.id"
+                class="restore-toast"
+            >
+                <span class="restore-toast__text">Стикер №{{ item.sticker.id }} удалён</span>
+                <button class="restore-toast__btn" @click="store.restoreSticker(item.sticker.id)">
+                    Восстановить
+                </button>
+            </div>
+        </TransitionGroup>
+    </div>
 </template>
 
 <style lang="sass" scoped>
-.restore-toast
+.restore-toasts
     position: fixed
     bottom: 90px
     left: 50%
     transform: translateX(-50%)
+    display: flex
+    flex-direction: column
+    gap: 8px
+    align-items: center
+    z-index: 10001
+
+.restore-toast
     display: flex
     align-items: center
     gap: 16px
@@ -29,7 +42,6 @@ const store = useMainStore()
     border-radius: 12px
     border: 1px solid rgba(0,0,0,0.06)
     box-shadow: 0 4px 14px rgba(0,0,0,0.12)
-    z-index: 10001
 
 .restore-toast__text
     font-size: 14px
@@ -55,11 +67,12 @@ const store = useMainStore()
         transform: translateY(0) scale(0.95)
 
 .toast-enter-active,
-.toast-leave-active
+.toast-leave-active,
+.toast-move
     transition: all 0.25s ease
 
 .toast-enter-from,
 .toast-leave-to
     opacity: 0
-    transform: translateX(-50%) translateY(16px)
+    transform: translateY(16px)
 </style>

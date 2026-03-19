@@ -1,6 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref } from 'vue';
 import { useMainStore } from '../stores/main.store';
 import Sticker from '../components/board/Sticker.vue';
 import CollapsedPanel from '@/components/board/CollapsedPanel.vue';
@@ -11,15 +10,7 @@ import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import RestoreToast from '@/components/modals/RestoreToast.vue';
 
 const store = useMainStore();
-const router = useRouter();
 const activeGeneralSettings = ref(false);
-
-onMounted(() => {
-  const visited = localStorage.getItem('welcome-shown');
-  if (!visited) {
-    router.replace('/');
-  }
-});
 
 function createStickerOnDoubleClick(event) {
   const rect = event.currentTarget.getBoundingClientRect();

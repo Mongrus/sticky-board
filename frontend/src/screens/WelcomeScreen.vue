@@ -1,21 +1,14 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store'
 import { useRouter } from 'vue-router'
-import { onMounted } from 'vue'
+import { WELCOME_STORAGE_KEY } from '@/constants/app.constants'
 import CookieModal from '@/components/modals/CookieModal.vue'
 
 const store = useMainStore()
 const router = useRouter()
 
-onMounted(() => {
-  const visited = localStorage.getItem('welcome-shown')
-  if (visited) {
-    router.replace('/board')
-  }
-})
-
 function startWork() {
-  localStorage.setItem('welcome-shown', 'true')
+  localStorage.setItem(WELCOME_STORAGE_KEY, 'true')
   router.push('/board')
 }
 </script>
@@ -31,8 +24,8 @@ function startWork() {
             </p>
             <RouterLink
             class="welcome__btn"
-            @click="startWork()"
             to="/board"
+            @click.prevent="startWork()"
             >
             Начать работу
             </RouterLink>
