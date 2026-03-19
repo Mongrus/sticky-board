@@ -89,11 +89,10 @@ function startDrag(e) {
             class="toolbar__btn-settings"
             :class="{ active: activeGeneralSettings }"
             @click="emit('toggleSettings')"
-        >
-        ⚙
-        </button>
+            aria-label="Настройки"
+        >&#9881;</button>
         <div class="toolbar__divider" aria-hidden="true"></div>
-        <button class="toolbar__btn-clear" @click="store.confirmClearBoard = true">♻</button>
+        <button class="toolbar__btn-clear" @click="store.confirmClearBoard = true" aria-label="Очистить доску">&#8855;</button>
     </div>
 </template>
 
@@ -118,7 +117,7 @@ function startDrag(e) {
     &:active
         cursor: grabbing
     button
-        padding: 10px
+        padding: 0
         border-radius: 50%
         border: none
         background: white
@@ -127,7 +126,8 @@ function startDrag(e) {
         color: #333
         cursor: pointer
         transition: all .15s ease
-        font-size: 18px
+        font-size: 21px
+        line-height: 1
         width: 40px
         height: 40px
         display: flex

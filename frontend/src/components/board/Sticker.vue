@@ -1,10 +1,12 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
 import { STICKER, STICKER_COLORS, STICKER_FONTS } from '@/constants/sticker.constants';
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 
 const store = useMainStore();
 const settingsSticker = ref(false);
+const stickerRef = ref(null);
+const popoverPosition = ref({ top: 0, right: 0 });
 
 const {sticker} = defineProps({
     sticker: Object
@@ -37,6 +39,19 @@ function updateFont() {
 function updateFontSize() {
     sticker.fs = localFontSize.value;
 }
+
+function handleClickOutside(e) {
+    if (settingsSticker.value && stickerRef.value && !stickerRef.value.contains(e.target)) {
+        settingsSticker.value = false;
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('pointerdown', handleClickOutside);
+});
+onUnmounted(() => {
+    document.removeEventListener('pointerdown', handleClickOutside);
+});
 
 let resizing = false
 
@@ -193,25 +208,49 @@ function resizeSticker(e, id, corner) {
     window.addEventListener('pointercancel', stop)
 }
 
+const POPOVER_WIDTH = 312;
+const POPOVER_HEIGHT = 270;
+const MARGIN = 8;
+
 function changingStickerSettings() {
-    settingsSticker.value = !settingsSticker.value
+    if (!settingsSticker.value && stickerRef.value) {
+        const rect = stickerRef.value.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        let top;
+        const hasSpaceAbove = rect.top > POPOVER_HEIGHT + MARGIN;
+        if (hasSpaceAbove) {
+            top = rect.top - POPOVER_HEIGHT;
+        } else {
+            top = rect.bottom + MARGIN;
+        }
+        top = Math.max(MARGIN, Math.min(top, vh - POPOVER_HEIGHT - MARGIN));
+
+        let right = vw - rect.right;
+        right = Math.max(MARGIN, Math.min(right, vw - POPOVER_WIDTH - MARGIN));
+
+        popoverPosition.value = { top, right };
+    }
+    settingsSticker.value = !settingsSticker.value;
 }
 
 </script>
 
 <template>
     <div
+        ref="stickerRef"
         class="sticker"
         :style="{
-        left: (!settingsSticker ? sticker.x : sticker.x + (sticker.w - 320) / 2) + 'px',
-        top: (!settingsSticker ? sticker.y : sticker.y + (sticker.h - 210) / 2) + 'px',
-        zIndex: sticker.z,
-        width: !settingsSticker ? sticker.w + 'px' : '320px',
-        height: !settingsSticker ? sticker.h + 'px' : '210px'
+            left: sticker.x + 'px',
+            top: sticker.y + 'px',
+            zIndex: sticker.z,
+            width: sticker.w + 'px',
+            height: sticker.h + 'px'
         }"
         @pointerdown="moveSticker($event, sticker.id)"
-        >
-            <textarea v-if="!settingsSticker"
+    >
+        <textarea
             class="content"
             :style="{
                 backgroundColor: sticker.bc,
@@ -224,41 +263,53 @@ function changingStickerSettings() {
             spellcheck="false"
             autocorrect="off"
             autocomplete="off"
-            ></textarea>
-            <div v-else class="settings-sticker">
-                <label>Цвет фона:</label>
-                <div class="color-palette">
-                    <button
-                        v-for="color in STICKER_COLORS"
-                        :key="color.value"
-                        class="color-palette__color"
-                        :style="{ backgroundColor: color.value }"
-                        :class="{ active: sticker.bc === color.value }"
-                        @pointerdown.stop @click="sticker.bc = color.value"
-                    ></button>
-                    <button
-                        class="color-palette__color"
-                        :style="{ backgroundColor: '#2B2B2B' }"
-                        :class="{ active: sticker.bc === '#2B2B2B' }"
-                        @pointerdown.stop @click="sticker.bc = '#2B2B2B'"
-                    ></button>
-                    <button
-                        class="color-palette__color"
-                        :style="{ backgroundColor: 'snow' }"
-                        :class="{ active: sticker.bc === 'snow' }"
-                        @pointerdown.stop @click="sticker.bc = 'snow'"
-                    ></button>
-                </div>
-                <label>Шрифт:</label>
-                <select v-model="localFont" @change="updateFont">
+        ></textarea>
+
+        <Teleport to="body">
+            <Transition name="popover">
+                <div
+                    v-show="settingsSticker"
+                    class="sticker-settings-popover"
+                    :style="{ top: popoverPosition.top + 'px', right: popoverPosition.right + 'px' }"
+                    @pointerdown.stop
+                >
+                <div class="sticker-settings-popover__inner">
+                    <label>Цвет фона:</label>
+                    <div class="color-palette">
+                        <button
+                            v-for="color in STICKER_COLORS"
+                            :key="color.value"
+                            class="color-palette__color"
+                            :style="{ backgroundColor: color.value }"
+                            :class="{ active: sticker.bc === color.value }"
+                            @pointerdown.stop @click="sticker.bc = color.value"
+                        ></button>
+                        <button
+                            class="color-palette__color"
+                            :style="{ backgroundColor: '#2B2B2B' }"
+                            :class="{ active: sticker.bc === '#2B2B2B' }"
+                            @pointerdown.stop @click="sticker.bc = '#2B2B2B'"
+                        ></button>
+                        <button
+                            class="color-palette__color"
+                            :style="{ backgroundColor: 'snow' }"
+                            :class="{ active: sticker.bc === 'snow' }"
+                            @pointerdown.stop @click="sticker.bc = 'snow'"
+                        ></button>
+                    </div>
+                    <label>Шрифт:</label>
+                    <select v-model="localFont" @change="updateFont">
                         <option v-for="font in STICKER_FONTS" :value="font.value">{{ font.label }}</option>
-                </select>
-                <label>Размер шрифта:</label>
-                <input type="number" v-model="localFontSize" @blur="updateFontSize">
+                    </select>
+                    <label>Размер шрифта:</label>
+                    <input type="number" v-model.number="localFontSize" @input="updateFontSize">
+                </div>
             </div>
-        <div v-if="!settingsSticker" class="resize resize__resize-lt"@pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
-        <div v-if="!settingsSticker" class="resize resize__resize-lb"@pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
-        <div v-if="!settingsSticker" class="resize resize__resize-rb"@pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
+        </Transition>
+        </Teleport>
+        <div class="resize resize__resize-lt" @pointerdown.stop="resizeSticker($event, sticker.id, 'lt')"></div>
+        <div class="resize resize__resize-lb" @pointerdown.stop="resizeSticker($event, sticker.id, 'lb')"></div>
+        <div class="resize resize__resize-rb" @pointerdown.stop="resizeSticker($event, sticker.id, 'rb')"></div>
         <div class="sticker__id" :style="{color: store.getTextColor(sticker.bc)}">
             <p>№{{ sticker.id }}</p>
         </div>
@@ -268,19 +319,22 @@ function changingStickerSettings() {
             @click="changingStickerSettings()"
             class="sticker-menu__btn-settings"
             :class="{ active: settingsSticker }"
-            >⚙</button>
+            aria-label="Настройки"
+            >&#9881;</button>
 
             <button
             @pointerdown.stop
             @click="store.setFoldedSticker(sticker.id)"
             class="sticker-menu__btn-collapse"
-            >-</button>
+            aria-label="Свернуть"
+            >&#8722;</button>
 
             <button 
             @pointerdown.stop 
             @click="store.deleteSticker(sticker.id)"
             class="sticker-menu__btn-delete"
-            >X</button>
+            aria-label="Удалить"
+            >&#215;</button>
         </div>
     </div>
 </template>
@@ -300,11 +354,6 @@ function changingStickerSettings() {
     &:hover .sticker__id
         opacity: .1
         transition: .3s
-    &:hover .resize
-        opacity: .5
-        &:hover
-            opacity: 1
-            cursor: pointer
     &__id
         position: absolute
         right: 0
@@ -380,37 +429,64 @@ function changingStickerSettings() {
 
 .resize
     position: absolute
-    width: 14px
-    height: 14px
-    border: 1px solid black
-    background-color: white
+    width: 22px
+    height: 22px
+    background: transparent
+    border: none
     opacity: 0
+    cursor: nwse-resize
     &__resize-lt
-        left: -2px
-        top: -2px
-        cursor: nwse-resize
+        left: -4px
+        top: -4px
     &__resize-rb
-        right: -2px
-        bottom: -2px
-        cursor: nwse-resize
+        right: -4px
+        bottom: -4px
     &__resize-lb
-        left: -2px
-        bottom: -2px
-        cursor: nwse-resize
+        left: -4px
+        bottom: -4px
+        cursor: nesw-resize
 
-.settings-sticker
+.sticker-settings-popover
+    position: fixed
+    z-index: 10002
+    width: 312px
+    max-height: 270px
+
+.sticker-settings-popover__inner
     display: flex
     flex-direction: column
-    background-color: #f5f5f5
-    padding: 15px
-    overflow: auto
-    width: 100%
-    height: 100%
+    gap: 8px
+    padding: 16px
+    background: #F5F8FC
+    border-radius: 12px
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15)
+    border: 1px solid rgba(0,0,0,0.06)
+    overflow-y: auto
+    max-height: 270px
+    label
+        font-size: 12px
+        font-weight: 500
+        color: #555
+    select, input
+        padding: 8px 10px
+        border: 1px solid #ddd
+        border-radius: 8px
+        font-size: 14px
+
+.popover-enter-active,
+.popover-leave-active
+    transition: opacity 0.15s ease, transform 0.15s ease
+
+.popover-enter-from,
+.popover-leave-to
+    opacity: 0
+    transform: translateY(4px)
 
 .color-palette
     display: flex
     flex-wrap: wrap
     gap: 6px
+    width: 280px
     &__color
         width: 20px
         height: 20px
