@@ -32,7 +32,9 @@ store.$subscribe((_, state) => {
 
 window.addEventListener('pagehide', () => {
   clearTimeout(persistTimeout)
-  persistStore(store.$state)
+  if (localStorage.getItem('stickers-store') !== null) {
+    persistStore(store.$state)
+  }
 })
 
 app.mount('#app')

@@ -1,19 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { STICKER_COLORS } from '@/constants/sticker.constants';
+import { COOKIE_CONSENT_KEY } from '@/constants/app.constants';
 
 export const useMainStore = defineStore('stickers', () => {
     
     const stickers = ref([]);
     const nextId = ref(1);
-    const cookiesConfirmed = ref(false);
+    const cookiesConfirmed = ref(
+        typeof window !== 'undefined' && localStorage.getItem(COOKIE_CONSENT_KEY) === 'true'
+    );
     const deletedStickers = ref([]);
     const confirmClearBoard = ref(false);
     const settings = ref({
         width: 200,
         height: 120,
         backgroundColor: 'color',
-        font: 'Roboto, sans-serif',
+        font: 'Andika, sans-serif',
         textColor: 'black',
         fontSize: 14
     });
@@ -92,6 +95,13 @@ export const useMainStore = defineStore('stickers', () => {
         stickers.value = stickers.value.filter(s => s.id !== id)
     }
 
+    function confirmCookies() {
+        cookiesConfirmed.value = true
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(COOKIE_CONSENT_KEY, 'true')
+        }
+    }
+
     function clearBoard() {
         nextId.value = 1;
         stickers.value = [];
@@ -99,16 +109,20 @@ export const useMainStore = defineStore('stickers', () => {
     }
 
     if (typeof window !== 'undefined') {
+    const fromCookieKey = localStorage.getItem(COOKIE_CONSENT_KEY) === 'true'
     const saved = localStorage.getItem('stickers-store')
 
     if (saved) {
         const data = JSON.parse(saved)
-
         stickers.value = data.stickers || []
         nextId.value = data.nextId || 1
         settings.value = data.settings || settings.value
-        cookiesConfirmed.value = data.cookiesConfirmed || false
+        if (data.cookiesConfirmed) {
+            cookiesConfirmed.value = true
+            if (!fromCookieKey) localStorage.setItem(COOKIE_CONSENT_KEY, 'true')
+        }
     }
+    if (fromCookieKey) cookiesConfirmed.value = true
     }
 
     return {
@@ -128,6 +142,7 @@ export const useMainStore = defineStore('stickers', () => {
         deleteSticker,
         restoreSticker,
         destroySticker,
+        confirmCookies,
         clearBoard
     }
 

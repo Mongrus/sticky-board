@@ -1,5 +1,4 @@
 <script setup>
-import { STICKER } from '../../constants/sticker.constants'
 import { useMainStore } from '@/stores/main.store';
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 
@@ -121,7 +120,7 @@ function startDrag(e) {
             store.settings.width, // Ширина
             store.settings.height, // Высота
             store.getDefaultColor(), // Цвет фона
-            STICKER.DEFAULT_FONT, // Шрифт
+            store.settings.font, // Шрифт
             store.settings.fontSize, // Размер шрифта
             store.getTextColor(store.getDefaultColor()), // Цвет текста
             Math.max(...store.stickers.map(s => s.z), 0) // z-index

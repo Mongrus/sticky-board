@@ -14,11 +14,11 @@ const store = useMainStore()
         </p>
 
         <div class="cookie__buttons accept">
-            <button class="accept" @click="store.cookiesConfirmed = true">
+            <button class="accept" @click="store.confirmCookies()">
                 Принять
             </button>
 
-            <button class="reject" @click="store.cookiesConfirmed = true">
+            <button class="reject" @click="store.confirmCookies()">
                 Только необходимые
             </button>
         </div>
