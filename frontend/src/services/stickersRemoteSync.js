@@ -18,6 +18,9 @@ import {
   flushOutboxPersistence
 } from '@/services/stickersOutbox'
 
+/** Нижняя граница для /stickers/removed, если ещё нет watermark (учёт чужих удалений при первом merge). */
+const REMOVED_SINCE_EPOCH = '1970-01-01T00:00:00.000Z'
+
 async function getMainStore() {
   const { useMainStore } = await import('@/stores/main.store')
   return useMainStore()
@@ -404,11 +407,19 @@ async function runAuthenticatedBoardSyncImpl() {
   const watermarkRows = [...serverList]
   const serverByUuid = new Map(serverList.map((s) => [s.uuid, s]))
 
+  const sinceForRemoved = readWatermark(auth) || REMOVED_SINCE_EPOCH
+  const { res: rRem, data: dRem } = await apiStickersRemovedSince(sinceForRemoved)
+  const removedRowsForBump = rRem.ok && Array.isArray(dRem?.removed) ? dRem.removed : []
+  const removedUuids = new Set(removedRowsForBump.map((r) => r.uuid))
+
   const merged = []
   const postQueue = []
   const patchQueue = []
 
   for (const local of localList) {
+    if (local.token && removedUuids.has(local.token)) {
+      continue
+    }
     const remote = serverByUuid.get(local.token)
     if (!remote) {
       postQueue.push(local)
@@ -442,6 +453,7 @@ async function runAuthenticatedBoardSyncImpl() {
   const mergedTokens = new Set(merged.map((s) => s.token))
   for (const s of store.stickers) {
     if (mergedTokens.has(s.token)) continue
+    if (s.token && removedUuids.has(s.token)) continue
     merged.push(s)
     postQueue.push(s)
     mergedTokens.add(s.token)
@@ -481,7 +493,7 @@ async function runAuthenticatedBoardSyncImpl() {
     }
   }
 
-  bumpWatermarkFromServerRows(auth, watermarkRows)
+  bumpWatermarkCombined(auth, watermarkRows, removedRowsForBump)
   bumpWatermarkFromLocalIfStillEmpty(auth, store)
 }
 

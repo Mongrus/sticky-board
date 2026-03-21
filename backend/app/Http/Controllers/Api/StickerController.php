@@ -44,7 +44,7 @@ class StickerController extends Controller
 
         $removed = Sticker::onlyTrashed()
             ->forUser($request->user()->id)
-            ->where('deleted_at', '>', $since)
+            ->where('deleted_at', '>=', $since)
             ->orderBy('id')
             ->get(['uuid', 'deleted_at'])
             ->map(fn (Sticker $s) => [

@@ -5,6 +5,8 @@ import { COOKIE_CONSENT_KEY } from '@/constants/app.constants';
 import { generateStickerToken, stickerNowIso } from '@/utils/stickerIdentity'
 import { STICKERS_STORE_GUEST_KEY } from '@/constants/storage.constants'
 import { mergeGuestBoardLww } from '@/utils/mergeGuestBoardLww'
+import { useAuthStore } from '@/stores/auth.store'
+import { clearOutbox } from '@/services/stickersOutbox'
 import {
   scheduleStickerRemotePatch,
   pushNewStickerToServer,
@@ -148,8 +150,16 @@ export const useMainStore = defineStore('stickers', () => {
     }
 
     function clearBoard() {
-        nextId.value = 1;
-        stickers.value = [];
+        const auth = useAuthStore()
+        if (auth.isAuthenticated) {
+            clearOutbox(auth)
+            for (const s of [...stickers.value]) {
+                if (s.token) void deleteStickerOnServer(s.token)
+            }
+        }
+        nextId.value = 1
+        stickers.value = []
+        deletedStickers.value = []
         confirmClearBoard.value = false
     }
 
