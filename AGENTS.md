@@ -18,19 +18,30 @@ stycky-board-prod/
 │   │   │   ├── layout/    # Footer
 │   │   │   └── modals/    # CookieModal, ConfirmModal, RestoreToast
 │   │   ├── constants/     # sticker.constants.js, app.constants.js
-│   │   ├── screens/       # WelcomeScreen, BoardApp, PrivacyPolicy
+│   │   ├── screens/       # WelcomeScreen, BoardApp, PrivacyPolicy, DevAuthScreen (только dev)
+│   │   ├── services/      # laravelApi.js — Sanctum + fetch с credentials
 │   │   ├── stores/        # main.store.js
 │   │   └── router/
 │   └── public/            # _redirects, .htaccess для SPA fallback
-└── backend/            # Laravel (готовность к будущему API)
+└── backend/            # Laravel API (`routes/api.php`, префикс `/api`)
 ```
 
-## Маршруты
+## Backend API (Laravel)
+- Маршруты: `backend/routes/api.php`, префикс **`/api`**, middleware-группа **`api`** (см. `bootstrap/app.php`).
+- Проверка: `GET http://localhost:8000/api/health` → JSON `{ ok, service }`.
+- **Laravel Sanctum (SPA)**: cookie + CSRF для первого лица (Vue на `FRONTEND_URL`). В `bootstrap/app.php` включён **`statefulApi()`**; модель **`User`** использует **`HasApiTokens`**. Миграция **`personal_access_tokens`** (Bearer-токены при необходимости).
+- **CORS**: `config/cors.php` — **`supports_credentials: true`** (через **`CORS_SUPPORTS_CREDENTIALS`**), **`FRONTEND_URL`**, пути `api/*` и `sanctum/csrf-cookie`.
+- **Stateful-домены**: `config/sanctum.php` + опционально **`SANCTUM_STATEFUL_DOMAINS`** в `.env` (по умолчанию включены `localhost:5173`, `127.0.0.1:5173` и хост из **`APP_URL`**).
+- Со стороны фронта перед логином: `GET /sanctum/csrf-cookie`, затем запросы с **`credentials: 'include'`** и заголовком **`X-XSRF-TOKEN`** (из cookie `XSRF-TOKEN`).
+- **Auth (JSON):** `POST /api/register` (name, email, password, password_confirmation), `POST /api/login` (email, password, опционально remember), `POST /api/logout` (только авторизованный), `GET /api/user` — успех: `{ user: { id, name, email, email_verified_at } }`.
+
+## Маршруты (frontend)
 | Путь | Экран | Описание |
 |------|-------|----------|
 | `/` | WelcomeScreen | Приветствие, кнопка «Начать работу» |
 | `/board` | BoardApp | Основная доска со стикерами |
 | `/privacy` | PrivacyPolicy | Политика конфиденциальности |
+| `/dev-auth` | DevAuthScreen | Только **`npm run dev`**: проверка login/register и `GET /api/user` (`VITE_API_URL` в `frontend/.env`) |
 
 **Логика навигации**: Пользователь должен один раз увидеть WelcomeScreen. После нажатия «Начать» флаг `welcome-shown` в localStorage. При заходе на `/` — редирект на `/board`. При заходе на `/board` без флага — редирект на `/`.
 

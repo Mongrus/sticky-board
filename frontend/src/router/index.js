@@ -6,13 +6,23 @@ const baseTitle = 'Онлайн Стикеры'
 import BoardApp from '../screens/BoardApp.vue'
 import PrivacyPolicy from '../screens/PrivacyPolicy.vue'
 
+const routes = [
+  { path: '/', component: WelcomeScreen, meta: { title: 'Добро пожаловать' } },
+  { path: '/board', component: BoardApp, meta: { title: 'Доска стикеров' } },
+  { path: '/privacy', component: PrivacyPolicy, meta: { title: 'Политика конфиденциальности' } }
+]
+
+if (import.meta.env.DEV) {
+  routes.push({
+    path: '/dev-auth',
+    component: () => import('@/screens/DevAuthScreen.vue'),
+    meta: { title: 'Dev: API auth' }
+  })
+}
+
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    { path: '/', component: WelcomeScreen, meta: { title: 'Добро пожаловать' } },
-    { path: '/board', component: BoardApp, meta: { title: 'Доска стикеров' } },
-    { path: '/privacy', component: PrivacyPolicy, meta: { title: 'Политика конфиденциальности' } }
-  ]
+  routes
 })
 
 router.beforeEach((to, from, next) => {
