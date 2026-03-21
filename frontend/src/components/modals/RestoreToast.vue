@@ -9,7 +9,7 @@ const store = useMainStore()
         <TransitionGroup name="toast">
             <div
                 v-for="item in store.deletedStickers"
-                :key="item.sticker.id"
+                :key="item.sticker.token ?? item.sticker.id"
                 class="restore-toast"
             >
                 <span class="restore-toast__text">Стикер №{{ item.sticker.id }} удалён</span>

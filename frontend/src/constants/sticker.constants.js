@@ -1,8 +1,11 @@
 export const STICKER = {
   MIN_WIDTH: 100,
   MIN_HEIGHT: 50,
-  DEFAULT_FONT: 'Andika, sans-serif',
-  TEXT_SAVE_DEBOUNCE_MS: 350
+  TEXT_SAVE_DEBOUNCE_MS: 350,
+  REMOTE_PATCH_DEBOUNCE_MS: 400,
+  /** Инкрементальный pull с сервера (видимая вкладка, залогинен, онлайн). */
+  REMOTE_PULL_INTERVAL_MS: 10_000,
+  SYNC_INCLUDE_LAYOUT: false
 }
 
 export const STICKER_COLORS = [

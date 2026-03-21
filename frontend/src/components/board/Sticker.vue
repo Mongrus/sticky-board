@@ -30,6 +30,7 @@ watch(() => sticker.fs, (newVal) => {
 
 function updateText() {
     sticker.text = localText.value;
+    store.bumpStickerUpdatedAt(sticker.id);
 }
 
 let textSaveTimer = null;
@@ -42,7 +43,6 @@ function scheduleTextSave() {
     }, STICKER.TEXT_SAVE_DEBOUNCE_MS);
 }
 
-/** Сразу пишем в store (потеря фокуса) и отменяем отложенное сохранение. */
 function flushTextOnBlur() {
     clearTimeout(textSaveTimer);
     textSaveTimer = null;
@@ -51,10 +51,17 @@ function flushTextOnBlur() {
 
 function updateFont() {
     sticker.font = localFont.value;
+    store.bumpStickerUpdatedAt(sticker.id);
 }
 
 function updateFontSize() {
     sticker.fs = localFontSize.value;
+    store.bumpStickerUpdatedAt(sticker.id);
+}
+
+function setStickerBackground(bc) {
+    sticker.bc = bc;
+    store.bumpStickerUpdatedAt(sticker.id);
 }
 
 function handleClickOutside(e) {
@@ -309,19 +316,19 @@ function changingStickerSettings() {
                             class="color-palette__color"
                             :style="{ backgroundColor: color.value }"
                             :class="{ active: sticker.bc === color.value }"
-                            @pointerdown.stop @click="sticker.bc = color.value"
+                            @pointerdown.stop @click="setStickerBackground(color.value)"
                         ></button>
                         <button
                             class="color-palette__color"
                             :style="{ backgroundColor: '#2B2B2B' }"
                             :class="{ active: sticker.bc === '#2B2B2B' }"
-                            @pointerdown.stop @click="sticker.bc = '#2B2B2B'"
+                            @pointerdown.stop @click="setStickerBackground('#2B2B2B')"
                         ></button>
                         <button
                             class="color-palette__color"
                             :style="{ backgroundColor: 'snow' }"
                             :class="{ active: sticker.bc === 'snow' }"
-                            @pointerdown.stop @click="sticker.bc = 'snow'"
+                            @pointerdown.stop @click="setStickerBackground('snow')"
                         ></button>
                     </div>
                     <label>Шрифт:</label>

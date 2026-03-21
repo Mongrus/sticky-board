@@ -12,6 +12,7 @@ const store = useMainStore();
                 <button 
                     class="collapsed-panel__sticker" 
                     v-for="sticker in store.stickers.filter(s => s.folded)" 
+                    :key="sticker.token ?? sticker.id"
                     :style="{ backgroundColor: sticker.bc, color: store.getTextColor(sticker.bc) }"
                     @click="store.setFoldedSticker(sticker.id)"
                     >

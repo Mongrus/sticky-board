@@ -1,5 +1,27 @@
-const baseUrl = () =>
-  (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '')
+const baseUrl = () => {
+  const raw = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  return String(raw).replace(/\/$/, '')
+}
+
+/** В проде запросы на localhost из браузера пользователя недостижимы, если не задан публичный API. */
+function ensureProductionApiConfigured() {
+  if (!import.meta.env.PROD) return
+  const b = baseUrl()
+  if (/localhost|127\.0\.0\.1/.test(b)) {
+    throw new Error(
+      'Сайт собран без публичного API: при сборке задайте VITE_API_URL = https://ваш-laravel (без / в конце) и пересоберите.'
+    )
+  }
+}
+
+function mapFetchFailure(err) {
+  if (import.meta.env.PROD && err instanceof TypeError && String(err.message).includes('fetch')) {
+    return new Error(
+      'Не удалось связаться с API. Проверьте VITE_API_URL при сборке, что Laravel доступен по HTTPS, CORS и FRONTEND_URL / Sanctum.'
+    )
+  }
+  return err
+}
 
 function readXsrfToken() {
   const row = document.cookie.split(';').find((c) => c.trim().startsWith('XSRF-TOKEN='))
@@ -19,19 +41,29 @@ async function request(path, options = {}) {
   if (token) {
     headers['X-XSRF-TOKEN'] = token
   }
-  const res = await fetch(`${baseUrl()}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers
-  })
-  return res
+  ensureProductionApiConfigured()
+  try {
+    const res = await fetch(`${baseUrl()}${path}`, {
+      credentials: 'include',
+      ...options,
+      headers
+    })
+    return res
+  } catch (e) {
+    throw mapFetchFailure(e)
+  }
 }
 
-/** Вызвать перед первым POST (login / register). */
 export async function fetchSanctumCsrfCookie() {
-  const res = await fetch(`${baseUrl()}/sanctum/csrf-cookie`, {
-    credentials: 'include'
-  })
+  ensureProductionApiConfigured()
+  let res
+  try {
+    res = await fetch(`${baseUrl()}/sanctum/csrf-cookie`, {
+      credentials: 'include'
+    })
+  } catch (e) {
+    throw mapFetchFailure(e)
+  }
   if (!res.ok) {
     throw new Error(`CSRF cookie: ${res.status} ${res.statusText}`)
   }
@@ -61,6 +93,14 @@ export async function apiLogout() {
 
 export async function apiUser() {
   return request('/api/user', { method: 'GET' })
+}
+
+export async function apiRequest(path, options = {}) {
+  const method = options.method || 'GET'
+  if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+    await fetchSanctumCsrfCookie()
+  }
+  return request(path, options)
 }
 
 export { baseUrl }

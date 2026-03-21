@@ -9,7 +9,17 @@ import PrivacyPolicy from '../screens/PrivacyPolicy.vue'
 const routes = [
   { path: '/', component: WelcomeScreen, meta: { title: 'Добро пожаловать' } },
   { path: '/board', component: BoardApp, meta: { title: 'Доска стикеров' } },
-  { path: '/privacy', component: PrivacyPolicy, meta: { title: 'Политика конфиденциальности' } }
+  { path: '/privacy', component: PrivacyPolicy, meta: { title: 'Политика конфиденциальности' } },
+  {
+    path: '/login',
+    component: () => import('@/screens/LoginScreen.vue'),
+    meta: { title: 'Вход', publicAuth: true }
+  },
+  {
+    path: '/register',
+    component: () => import('@/screens/RegisterScreen.vue'),
+    meta: { title: 'Регистрация', publicAuth: true }
+  }
 ]
 
 if (import.meta.env.DEV) {

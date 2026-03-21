@@ -36,7 +36,7 @@ function createStickerOnDoubleClick(event) {
 <template>
     <main>
             <div class="board" @dblclick="createStickerOnDoubleClick">
-              <Sticker v-for="sticker in store.stickers.filter(s => !s.folded)" :sticker="sticker" :key="sticker.id"/>
+              <Sticker v-for="sticker in store.stickers.filter(s => !s.folded)" :sticker="sticker" :key="sticker.token ?? sticker.id"/>
             </div>
             
             <CollapsedPanel />

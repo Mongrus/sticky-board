@@ -28,6 +28,7 @@ class StickerTest extends TestCase
         $this->postJson('/api/stickers', [])->assertUnauthorized();
         $this->patchJson('/api/stickers/'.Str::uuid()->toString(), [])->assertUnauthorized();
         $this->deleteJson('/api/stickers/'.Str::uuid()->toString())->assertUnauthorized();
+        $this->getJson('/api/stickers/removed?since='.now()->toIso8601String())->assertUnauthorized();
     }
 
     public function test_user_can_list_empty_stickers(): void
@@ -121,7 +122,56 @@ class StickerTest extends TestCase
             ->deleteJson('/api/stickers/'.$sticker->uuid)
             ->assertNoContent();
 
-        $this->assertDatabaseMissing('stickers', ['id' => $sticker->id]);
+        $this->assertSoftDeleted($sticker);
+    }
+
+    public function test_deleted_sticker_not_in_index(): void
+    {
+        $user = User::factory()->create();
+        $sticker = Sticker::factory()->for($user)->create();
+
+        $this->actingAs($user)->deleteJson('/api/stickers/'.$sticker->uuid)->assertNoContent();
+
+        $this->actingAs($user)
+            ->getJson('/api/stickers')
+            ->assertOk()
+            ->assertJsonPath('stickers', []);
+    }
+
+    public function test_removed_since_returns_soft_deleted_uuids(): void
+    {
+        $user = User::factory()->create();
+        $sticker = Sticker::factory()->for($user)->create();
+        $since = now()->subSecond()->toIso8601String();
+
+        $this->actingAs($user)->deleteJson('/api/stickers/'.$sticker->uuid)->assertNoContent();
+
+        $this->actingAs($user)
+            ->getJson('/api/stickers/removed?since='.urlencode($since))
+            ->assertOk()
+            ->assertJsonCount(1, 'removed')
+            ->assertJsonPath('removed.0.uuid', $sticker->uuid);
+    }
+
+    public function test_post_with_uuid_restores_soft_deleted_sticker(): void
+    {
+        $user = User::factory()->create();
+        $uuid = (string) Str::uuid();
+        $sticker = Sticker::factory()->for($user)->create(['uuid' => $uuid, 'text' => 'old']);
+        $sticker->delete();
+
+        $this->actingAs($user)
+            ->postJson('/api/stickers', [
+                'uuid' => $uuid,
+                'text' => 'restored',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('sticker.text', 'restored');
+
+        $this->assertDatabaseHas('stickers', [
+            'uuid' => $uuid,
+            'deleted_at' => null,
+        ]);
     }
 
     public function test_user_gets_404_for_other_users_sticker_on_patch(): void

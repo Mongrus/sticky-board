@@ -12,9 +12,6 @@ use Illuminate\Validation\Rule;
 
 class StickerController extends Controller
 {
-    /**
-     * List current user's stickers. Optional ?since= ISO8601 — only rows updated strictly after that time.
-     */
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -37,14 +34,62 @@ class StickerController extends Controller
         ]);
     }
 
-    /**
-     * Create a sticker. Client may send uuid; otherwise server generates one.
-     */
+    public function removedSince(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'since' => ['required', 'date'],
+        ]);
+
+        $since = Carbon::parse($validated['since']);
+
+        $removed = Sticker::onlyTrashed()
+            ->forUser($request->user()->id)
+            ->where('deleted_at', '>', $since)
+            ->orderBy('id')
+            ->get(['uuid', 'deleted_at'])
+            ->map(fn (Sticker $s) => [
+                'uuid' => $s->uuid,
+                'deleted_at' => $s->deleted_at?->toIso8601String(),
+            ]);
+
+        return response()->json([
+            'removed' => $removed,
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $this->validateStickerPayload($request, creating: true);
 
         $uuid = $validated['uuid'] ?? (string) Str::uuid();
+
+        $trashed = Sticker::onlyTrashed()
+            ->forUser($request->user()->id)
+            ->where('uuid', $uuid)
+            ->first();
+
+        if ($trashed !== null) {
+            $trashed->restore();
+            $trashed->fill([
+                'text' => $validated['text'] ?? '',
+                'folded' => $validated['folded'] ?? false,
+                'x' => $validated['x'] ?? 100,
+                'y' => $validated['y'] ?? 100,
+                'w' => $validated['w'] ?? 200,
+                'h' => $validated['h'] ?? 120,
+                'bc' => $validated['bc'] ?? '#FFF9B4',
+                'font' => $validated['font'] ?? 'Andika, sans-serif',
+                'fs' => $validated['fs'] ?? 14,
+                'tc' => $validated['tc'] ?? '#2B2B2B',
+                'z' => $validated['z'] ?? 0,
+            ]);
+            $trashed->save();
+            $trashed->refresh();
+
+            return response()->json([
+                'sticker' => $this->toApiArray($trashed),
+            ], 201);
+        }
 
         $sticker = Sticker::create([
             'user_id' => $request->user()->id,
@@ -69,9 +114,6 @@ class StickerController extends Controller
         ], 201);
     }
 
-    /**
-     * Partial update by public uuid (only owner).
-     */
     public function update(Request $request, string $uuid): JsonResponse
     {
         $sticker = $this->findOwnedOrAbort($request, $uuid);
@@ -87,9 +129,6 @@ class StickerController extends Controller
         ]);
     }
 
-    /**
-     * Delete by public uuid (only owner).
-     */
     public function destroy(Request $request, string $uuid): JsonResponse
     {
         $sticker = $this->findOwnedOrAbort($request, $uuid);
@@ -112,13 +151,18 @@ class StickerController extends Controller
         return $sticker;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     private function validateStickerPayload(Request $request, bool $creating): array
     {
         $uuidRule = $creating
-            ? ['sometimes', 'nullable', 'uuid', Rule::unique('stickers', 'uuid')]
+            ? [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::unique('stickers', 'uuid')->where(function ($query) use ($request) {
+                    $query->where('user_id', $request->user()->id)
+                        ->whereNull('deleted_at');
+                }),
+            ]
             : ['prohibited'];
 
         $rules = [
@@ -139,9 +183,6 @@ class StickerController extends Controller
         return $request->validate($rules);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     private function toApiArray(Sticker $sticker): array
     {
         return [

@@ -29,6 +29,11 @@ function startWork() {
             >
             Начать работу
             </RouterLink>
+            <p class="welcome__auth">
+              <RouterLink class="welcome__auth-link" to="/login">Войти</RouterLink>
+              <span class="welcome__auth-sep">·</span>
+              <RouterLink class="welcome__auth-link" to="/register">Регистрация</RouterLink>
+            </p>
         </div>
         <CookieModal v-if="!store.cookiesConfirmed"/>
     </div>
@@ -90,5 +95,20 @@ p
 
 .welcome__btn:active
     transform: translateY(1px)
+
+.welcome__auth
+    margin: 20px 0 0
+    font-size: 15px
+    color: #666
+
+.welcome__auth-link
+    color: #5C9CFF
+    text-decoration: none
+    &:hover
+        text-decoration: underline
+
+.welcome__auth-sep
+    margin: 0 10px
+    color: #aaa
 
 </style>
