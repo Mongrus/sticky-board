@@ -1,7 +1,8 @@
 export const STICKER = {
   MIN_WIDTH: 100,
   MIN_HEIGHT: 50,
-  DEFAULT_FONT: 'Andika, sans-serif'
+  DEFAULT_FONT: 'Andika, sans-serif',
+  TEXT_SAVE_DEBOUNCE_MS: 350
 }
 
 export const STICKER_COLORS = [

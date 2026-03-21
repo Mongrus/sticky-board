@@ -32,6 +32,23 @@ function updateText() {
     sticker.text = localText.value;
 }
 
+let textSaveTimer = null;
+
+function scheduleTextSave() {
+    clearTimeout(textSaveTimer);
+    textSaveTimer = setTimeout(() => {
+        textSaveTimer = null;
+        updateText();
+    }, STICKER.TEXT_SAVE_DEBOUNCE_MS);
+}
+
+/** Сразу пишем в store (потеря фокуса) и отменяем отложенное сохранение. */
+function flushTextOnBlur() {
+    clearTimeout(textSaveTimer);
+    textSaveTimer = null;
+    updateText();
+}
+
 function updateFont() {
     sticker.font = localFont.value;
 }
@@ -51,6 +68,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
     document.removeEventListener('pointerdown', handleClickOutside);
+    clearTimeout(textSaveTimer);
 });
 
 let resizing = false
@@ -267,7 +285,8 @@ function changingStickerSettings() {
                 color: store.getTextColor(sticker.bc)
             }"
             v-model="localText"
-            @blur="updateText"
+            @input="scheduleTextSave"
+            @blur="flushTextOnBlur"
             spellcheck="false"
             autocorrect="off"
             autocomplete="off"

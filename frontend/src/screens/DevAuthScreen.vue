@@ -8,6 +8,9 @@ import {
   apiLogout,
   apiUser
 } from '@/services/laravelApi'
+import { useAuthStore } from '@/stores/auth.store'
+
+const authStore = useAuthStore()
 
 const lastJson = ref(null)
 const lastStatus = ref('')
@@ -38,6 +41,10 @@ async function run(label, fn) {
     }
     if (!res.ok) {
       error.value = `Ошибка HTTP ${res.status}`
+    } else if (typeof lastJson.value === 'object' && lastJson.value?.user) {
+      authStore.setAuthenticated(lastJson.value.user)
+    } else if (label.startsWith('POST /api/logout')) {
+      authStore.setGuest()
     }
   } catch (e) {
     error.value = e?.message || String(e)
@@ -87,6 +94,11 @@ function user() {
     </p>
     <p class="dev-auth__api">
       API: <strong>{{ baseUrl() }}</strong>
+    </p>
+    <p class="dev-auth__mode">
+      Режим Pinia:
+      <strong>{{ authStore.isGuest ? 'гость (только localStorage для доски)' : 'авторизован' }}</strong>
+      <template v-if="authStore.user"> — {{ authStore.user.email }}</template>
     </p>
 
     <section class="dev-auth__block">
@@ -144,7 +156,8 @@ function user() {
   border-radius: 8px
   font-size: 14px
 
-.dev-auth__api
+.dev-auth__api,
+.dev-auth__mode
   font-size: 14px
   color: #555
   margin: 12px 0

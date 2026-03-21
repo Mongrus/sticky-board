@@ -3,6 +3,15 @@ import { ref } from 'vue'
 import { STICKER_COLORS } from '@/constants/sticker.constants';
 import { COOKIE_CONSENT_KEY } from '@/constants/app.constants';
 
+const DEFAULT_SETTINGS = {
+    width: 200,
+    height: 120,
+    backgroundColor: 'color',
+    font: 'Andika, sans-serif',
+    textColor: 'black',
+    fontSize: 14
+}
+
 export const useMainStore = defineStore('stickers', () => {
     
     const stickers = ref([]);
@@ -12,14 +21,7 @@ export const useMainStore = defineStore('stickers', () => {
     );
     const deletedStickers = ref([]);
     const confirmClearBoard = ref(false);
-    const settings = ref({
-        width: 200,
-        height: 120,
-        backgroundColor: 'color',
-        font: 'Andika, sans-serif',
-        textColor: 'black',
-        fontSize: 14
-    });
+    const settings = ref({ ...DEFAULT_SETTINGS });
 
     function getDefaultColor() {
 
@@ -108,21 +110,36 @@ export const useMainStore = defineStore('stickers', () => {
         confirmClearBoard.value = false
     }
 
-    if (typeof window !== 'undefined') {
-    const fromCookieKey = localStorage.getItem(COOKIE_CONSENT_KEY) === 'true'
-    const saved = localStorage.getItem('stickers-store')
+    /**
+     * Загрузка доски из localStorage по ключу (гость / user id).
+     * Вызывать после определения режима auth.
+     */
+    function hydrateFromLocalStorageKey(storageKey) {
+        if (typeof window === 'undefined') return
+        const fromCookieKey = localStorage.getItem(COOKIE_CONSENT_KEY) === 'true'
+        const saved = localStorage.getItem(storageKey)
 
-    if (saved) {
-        const data = JSON.parse(saved)
-        stickers.value = data.stickers || []
-        nextId.value = data.nextId || 1
-        settings.value = data.settings || settings.value
-        if (data.cookiesConfirmed) {
-            cookiesConfirmed.value = true
-            if (!fromCookieKey) localStorage.setItem(COOKIE_CONSENT_KEY, 'true')
+        if (saved) {
+            try {
+                const data = JSON.parse(saved)
+                stickers.value = data.stickers || []
+                nextId.value = data.nextId || 1
+                settings.value = { ...DEFAULT_SETTINGS, ...(data.settings || {}) }
+                if (data.cookiesConfirmed) {
+                    cookiesConfirmed.value = true
+                    if (!fromCookieKey) localStorage.setItem(COOKIE_CONSENT_KEY, 'true')
+                }
+            } catch {
+                stickers.value = []
+                nextId.value = 1
+                settings.value = { ...DEFAULT_SETTINGS }
+            }
+        } else {
+            stickers.value = []
+            nextId.value = 1
+            settings.value = { ...DEFAULT_SETTINGS }
         }
-    }
-    if (fromCookieKey) cookiesConfirmed.value = true
+        if (fromCookieKey) cookiesConfirmed.value = true
     }
 
     return {
@@ -143,7 +160,8 @@ export const useMainStore = defineStore('stickers', () => {
         restoreSticker,
         destroySticker,
         confirmCookies,
-        clearBoard
+        clearBoard,
+        hydrateFromLocalStorageKey
     }
 
 })

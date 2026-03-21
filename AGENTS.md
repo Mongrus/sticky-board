@@ -6,7 +6,7 @@
 ## Стек
 - **Frontend**: Vue 3 (Composition API), Pinia, Vue Router, Vite, SASS
 - **Backend**: Laravel 12 (пока минимально задействован)
-- **Хранение**: localStorage (без бэкенда на данный момент)
+- **Хранение**: localStorage (синк с API — по мере внедрения)
 
 ## Структура проекта
 ```
@@ -17,10 +17,10 @@ stycky-board-prod/
 │   │   │   ├── board/     # Sticker, Toolbar, SettingsPanel, CollapsedPanel
 │   │   │   ├── layout/    # Footer
 │   │   │   └── modals/    # CookieModal, ConfirmModal, RestoreToast
-│   │   ├── constants/     # sticker.constants.js, app.constants.js
+│   │   ├── constants/     # sticker, app, auth, storage.constants.js (ключи localStorage доски)
 │   │   ├── screens/       # WelcomeScreen, BoardApp, PrivacyPolicy, DevAuthScreen (только dev)
 │   │   ├── services/      # laravelApi.js — Sanctum + fetch с credentials
-│   │   ├── stores/        # main.store.js
+│   │   ├── stores/        # main.store.js, auth.store.js (гость / сессия)
 │   │   └── router/
 │   └── public/            # _redirects, .htaccess для SPA fallback
 └── backend/            # Laravel API (`routes/api.php`, префикс `/api`)
@@ -46,14 +46,20 @@ stycky-board-prod/
 **Логика навигации**: Пользователь должен один раз увидеть WelcomeScreen. После нажатия «Начать» флаг `welcome-shown` в localStorage. При заходе на `/` — редирект на `/board`. При заходе на `/board` без флага — редирект на `/`.
 
 ## Store (Pinia)
+### main (`main.store.js`)
 - **stickers** — массив стикеров
 - **deletedStickers** — массив удалённых (для restore toast)
 - **settings** — дефолт: ширина, высота, тема цвета, шрифт, размер
 - **cookiesConfirmed**, **confirmClearBoard**
 
+### auth (`auth.store.js`)
+- **`authMode`**: `AUTH_MODE_GUEST` | `AUTH_MODE_AUTHENTICATED` (`auth.constants.js`)
+- **`isGuest`**: нет сессии Laravel → доска в ключе **`stickers-store-guest`**; при входе — **`stickers-store-user-{id}`** (гость и аккаунт не смешиваются). См. `storage.constants.js`, миграция из старого **`stickers-store`** → гостевой ключ при первом запуске.
+- **`refreshSession()`**: при старте приложения `GET /api/user` с credentials; при ошибке/401 → `setGuest()`
+
 Структура стикера: `{ id, text, folded, x, y, w, h, bc, font, fs, tc, z }`
 
-Персистенция: `$subscribe` → localStorage с debounce 200ms. При `pagehide` — немедленное сохранение.
+Персистенция: ключ зависит от auth (`getStickersStoreLocalStorageKey`); при смене гость ↔ пользователь — сброс в старый ключ + `hydrateFromLocalStorageKey` для нового. `$subscribe` → debounce 200ms; `pagehide` — flush. Текст стикера: debounce при вводе (`STICKER.TEXT_SAVE_DEBOUNCE_MS`) + **blur** textarea.
 
 ## Основные возможности
 1. **Стикеры**: создание (клик + на тулбаре, двойной клик по доске), перетаскивание, ресайз (углы lt, lb, rb — невидимые), свёртывание
