@@ -1,12 +1,40 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
-import { ref, watch } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 
-defineProps({
+const props = defineProps({
     active: Boolean
 })
 
+const emit = defineEmits(['close'])
+
 const store = useMainStore();
+const panelRef = ref(null);
+
+function onDocumentPointerDown(e) {
+    if (!props.active || !panelRef.value) return;
+    if (panelRef.value.contains(e.target)) return;
+    // Иначе клик по кнопке настроек в тулбаре: сначала close, потом toggle — панель снова откроется
+    if (e.target.closest('.toolbar')) return;
+    emit('close');
+}
+
+watch(
+    () => props.active,
+    (isActive) => {
+        if (isActive) {
+            requestAnimationFrame(() => {
+                document.addEventListener('pointerdown', onDocumentPointerDown);
+            });
+        } else {
+            document.removeEventListener('pointerdown', onDocumentPointerDown);
+        }
+    }
+);
+
+onUnmounted(() => {
+    document.removeEventListener('pointerdown', onDocumentPointerDown);
+});
 
 const localFontSize = ref(store.settings.fontSize);
 const localHeight = ref(store.settings.height);
@@ -43,11 +71,16 @@ function updateBackgroundColor() {
 
 function updateWidth() {
     store.settings.width = localWidth.value;
-}</script>
+}
+
+function resetToDefaults() {
+    store.resetGeneralSettingsToDefaults();
+}
+</script>
 
 <template>
     <Transition name="slide-in-right">
-        <div v-show="active" class="general-settings-panel">
+        <div ref="panelRef" v-show="active" class="general-settings-panel">
             <h3>Настройки по-умолчанию</h3>
             <div class="setting-item">
                 <label>🎨 Основная тема стикеров:</label>
@@ -69,6 +102,9 @@ function updateWidth() {
                 <label>📐 Ширина:</label>
                 <input type="number" v-model="localWidth" @blur="updateWidth" min="100">
             </div>
+            <button type="button" class="settings-reset-btn" @click="resetToDefaults">
+                По умолчанию
+            </button>
         </div>
     </Transition>
 </template>
@@ -97,6 +133,27 @@ function updateWidth() {
         font-weight: 600
         color: #333
         text-align: center
+    .settings-reset-btn
+        margin-top: 8px
+        padding: 10px 12px
+        font-size: 14px
+        font-weight: 500
+        color: #333
+        border: 1px solid #ddd
+        border-radius: 8px
+        background: white
+        cursor: pointer
+        transition: all 0.2s ease
+        &:hover
+            transition: 0.3s
+            border-color: #5C9CFF
+            background-color: #5C9CFF
+            color: white
+            box-shadow: 0 2px 8px rgba(92, 156, 255, 0.35)
+        &:focus-visible
+            outline: none
+            border-color: #5C9CFF
+            box-shadow: 0 0 0 3px rgba(92, 156, 255, 0.35)
     .setting-item
         display: flex
         flex-direction: column

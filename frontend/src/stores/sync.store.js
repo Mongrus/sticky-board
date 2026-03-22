@@ -12,6 +12,13 @@ export const useSyncStore = defineStore('sync', () => {
     boardLayoutGestureToken.value = token
   }
 
+  /** Пока курсор в textarea стикера — pull не затирает текст (иначе откат каждые N с). */
+  const boardTextEditToken = ref(null)
+
+  function setBoardTextEditToken(token) {
+    boardTextEditToken.value = token
+  }
+
   function setNetworkOnline(value) {
     networkOnline.value = value
     if (!value) {
@@ -38,6 +45,8 @@ export const useSyncStore = defineStore('sync', () => {
     networkOnline,
     boardLayoutGestureToken,
     setBoardLayoutGestureToken,
+    boardTextEditToken,
+    setBoardTextEditToken,
     setNetworkOnline,
     setSyncing,
     setSynced,

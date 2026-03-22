@@ -41,7 +41,10 @@ function createStickerOnDoubleClick(event) {
             
             <CollapsedPanel />
 
-            <SettingsPanel :active="activeGeneralSettings" />
+            <SettingsPanel
+                :active="activeGeneralSettings"
+                @close="activeGeneralSettings = false"
+            />
 
             <Toolbar
                 :activeGeneralSettings="activeGeneralSettings"
@@ -80,6 +83,8 @@ main
     background: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)
     background-size: 20px 20px
     position: relative
+    z-index: 0
+    isolation: isolate
     min-height: 100%
 
 </style>

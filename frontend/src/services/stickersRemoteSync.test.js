@@ -13,6 +13,10 @@ const mockSync = vi.hoisted(() => {
     setBoardLayoutGestureToken: vi.fn((token) => {
       o.boardLayoutGestureToken = token
     }),
+    boardTextEditToken: null,
+    setBoardTextEditToken: vi.fn((token) => {
+      o.boardTextEditToken = token
+    }),
     setError: vi.fn(() => {
       o.syncStatus = 'error'
     }),
@@ -95,6 +99,7 @@ beforeEach(async () => {
   mockSync.networkOnline = true
   mockSync.syncStatus = 'synced'
   mockSync.setBoardLayoutGestureToken(null)
+  mockSync.setBoardTextEditToken(null)
   mockMain.stickers.splice(0, mockMain.stickers.length)
   mockMain.nextId = 10
 
@@ -414,6 +419,40 @@ describe('stickersRemoteSync', () => {
     expect(stickersApiMocks.apiStickerPatch).not.toHaveBeenCalled()
   })
 
+  it('pullStickersSinceWatermark: no content merge while board text edit token set', async () => {
+    localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
+    const token = 'ffffffff-ffff-4fff-ffff-ffffffffffff'
+    mockMain.stickers.push(
+      baseSticker({
+        token,
+        text: 'user typing',
+        updated_at: '2025-01-01T00:00:00.000Z'
+      })
+    )
+    mockSync.setBoardTextEditToken(token)
+
+    stickersApiMocks.apiStickersList.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: {
+        stickers: [
+          {
+            uuid: token,
+            updated_at: '2025-12-01T00:00:00.000Z',
+            text: 'from server newer',
+            folded: false
+          }
+        ]
+      }
+    })
+
+    stickersApiMocks.apiStickerPatch.mockClear()
+
+    await pullStickersSinceWatermark()
+
+    expect(mockMain.stickers.find((s) => s.token === token).text).toBe('user typing')
+    expect(stickersApiMocks.apiStickerPatch).not.toHaveBeenCalled()
+  })
+
   it('guest: pushNewStickerToServer is no-op', async () => {
     mockAuth.isAuthenticated = false
     mockAuth.user = null
@@ -440,7 +479,7 @@ describe('stickersRemoteSync', () => {
       vi.unstubAllGlobals()
     })
 
-    it('registers setInterval with STICKER.REMOTE_PULL_INTERVAL_MS (10s pull)', async () => {
+    it('registers setInterval with STICKER.REMOTE_PULL_INTERVAL_MS', async () => {
       const { STICKER } = await import('@/constants/sticker.constants')
       const setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(() => 99)
 
@@ -450,7 +489,7 @@ describe('stickersRemoteSync', () => {
         expect.any(Function),
         STICKER.REMOTE_PULL_INTERVAL_MS
       )
-      expect(STICKER.REMOTE_PULL_INTERVAL_MS).toBe(10_000)
+      expect(STICKER.REMOTE_PULL_INTERVAL_MS).toBe(3_000)
     })
 
     it('second init clears previous interval id', async () => {

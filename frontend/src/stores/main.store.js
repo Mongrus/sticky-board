@@ -243,6 +243,10 @@ export const useMainStore = defineStore('stickers', () => {
         }
     }
 
+    function resetGeneralSettingsToDefaults() {
+        settings.value = { ...DEFAULT_SETTINGS }
+    }
+
     return {
         stickers,
         settings,
@@ -263,7 +267,8 @@ export const useMainStore = defineStore('stickers', () => {
         clearBoard,
         hydrateFromLocalStorageKey,
         mergeGuestBoardLwwIntoUserStore,
-        bumpStickerUpdatedAt
+        bumpStickerUpdatedAt,
+        resetGeneralSettingsToDefaults
     }
 
 })

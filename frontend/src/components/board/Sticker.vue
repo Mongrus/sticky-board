@@ -85,6 +85,15 @@ function flushTextOnBlur() {
     updateText();
 }
 
+function onTextareaFocus() {
+    syncStore.setBoardTextEditToken(sticker.token);
+}
+
+function onTextareaBlur() {
+    flushTextOnBlur();
+    syncStore.setBoardTextEditToken(null);
+}
+
 function updateFont() {
     sticker.font = localFont.value;
     store.bumpStickerUpdatedAt(sticker.id);
@@ -112,32 +121,46 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener('pointerdown', handleClickOutside);
     clearTimeout(textSaveTimer);
+    if (syncStore.boardTextEditToken === sticker.token) {
+        syncStore.setBoardTextEditToken(null);
+    }
 });
 
 let resizing = false
+
+/** Порог в px: без него pointerdown с textarea не доходит до .sticker (нужен bubble), но тогда каждый клик начинал бы драг. */
+const STICKER_DRAG_THRESHOLD_PX = 8
 
 function moveSticker(e, id) {
 
     if (resizing) return
 
-    syncStore.setBoardLayoutGestureToken(sticker.token)
-
     const el = e.currentTarget
-    el.setPointerCapture(e.pointerId)
-
-    document.body.style.cursor = 'grabbing'
-
-    dragActive.value = true
-    dragDelta.value = { dx: 0, dy: 0 }
-
     const startX = e.clientX
     const startY = e.clientY
 
     let dx = 0
     let dy = 0
-
     let rafId = null
+    let dragCommitted = false
+
+    function tryCommitDrag(ev) {
+        if (dragCommitted) return
+        const mx = ev.clientX - startX
+        const my = ev.clientY - startY
+        if (mx * mx + my * my < STICKER_DRAG_THRESHOLD_PX * STICKER_DRAG_THRESHOLD_PX) return
+        dragCommitted = true
+        syncStore.setBoardLayoutGestureToken(sticker.token)
+        el.setPointerCapture(ev.pointerId)
+        document.body.style.cursor = 'grabbing'
+        dragActive.value = true
+        dragDelta.value = { dx: 0, dy: 0 }
+        ev.preventDefault()
+    }
+
     const move = (ev) => {
+        tryCommitDrag(ev)
+        if (!dragCommitted) return
         dx = ev.clientX - startX
         dy = ev.clientY - startY
         if (rafId === null) {
@@ -149,6 +172,14 @@ function moveSticker(e, id) {
     }
 
     const stop = (ev) => {
+
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', stop)
+        window.removeEventListener('pointercancel', stop)
+
+        if (!dragCommitted) {
+            return
+        }
 
         document.body.style.cursor = ''
 
@@ -179,10 +210,6 @@ function moveSticker(e, id) {
                 dragActive.value = false
             })
         })
-
-        window.removeEventListener('pointermove', move)
-        window.removeEventListener('pointerup', stop)
-        window.removeEventListener('pointercancel', stop)
     }
 
     window.addEventListener('pointermove', move)
@@ -345,7 +372,8 @@ function changingStickerSettings() {
             }"
             v-model="localText"
             @input="scheduleTextSave"
-            @blur="flushTextOnBlur"
+            @focus="onTextareaFocus"
+            @blur="onTextareaBlur"
             spellcheck="false"
             autocorrect="off"
             autocomplete="off"
