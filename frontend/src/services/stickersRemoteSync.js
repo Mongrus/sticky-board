@@ -1,5 +1,5 @@
-import { STICKER } from '@/constants/sticker.constants'
-import { getPullWatermarkStorageKey } from '@/constants/storage.constants'
+import { STICKER, clampStickerFontSize } from '@/constants/sticker.constants'
+import { getBoardEpochStorageKey, getPullWatermarkStorageKey } from '@/constants/storage.constants'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSyncStore } from '@/stores/sync.store'
 import {
@@ -69,6 +69,56 @@ function readWatermark(authStore) {
   return localStorage.getItem(key) || ''
 }
 
+function readStoredBoardEpoch(authStore) {
+  const key = getBoardEpochStorageKey(authStore)
+  if (!key) return null
+  const raw = localStorage.getItem(key)
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isNaN(n) ? null : n
+}
+
+function writeStoredBoardEpoch(authStore, epoch) {
+  const key = getBoardEpochStorageKey(authStore)
+  if (!key) return
+  const n = Number(epoch)
+  if (Number.isNaN(n)) return
+  localStorage.setItem(key, String(n))
+}
+
+/**
+ * Сервер поднял board_epoch; в этом ответе нет строк стикеров и нет removed — авторитетная пустая доска.
+ * prevEpoch === null: ещё не было успешного merge — не затираем гостевой снимок.
+ */
+async function tryApplyRemoteBoardEpochWipe(authStore, boardEpoch, stickerRowsInResponse, removedRowsLength) {
+  if (!Array.isArray(stickerRowsInResponse) || stickerRowsInResponse.length > 0) return false
+  if (removedRowsLength > 0) return false
+  if (Number.isNaN(boardEpoch)) return false
+
+  const prevEpoch = readStoredBoardEpoch(authStore)
+  if (prevEpoch === null || boardEpoch <= prevEpoch) return false
+
+  const sync = useSyncStore()
+  const textBusy = sync.boardTextEditToken != null && sync.boardTextEditToken !== ''
+
+  const store = await getMainStore()
+  if (store.stickers.length === 0) {
+    writeStoredBoardEpoch(authStore, boardEpoch)
+    return false
+  }
+
+  if (loadOutboxOps(authStore).length > 0) return false
+  if (isAnyBoardLayoutGestureActive() || textBusy) return false
+
+  store.stickers = []
+  store.nextId = 1
+  const wk = getPullWatermarkStorageKey(authStore)
+  if (wk) localStorage.removeItem(wk)
+  writeStoredBoardEpoch(authStore, boardEpoch)
+  bumpWatermarkFromLocalIfStillEmpty(authStore, store)
+  return true
+}
+
 function writeWatermark(authStore, iso) {
   const key = getPullWatermarkStorageKey(authStore)
   if (!key || !iso) return
@@ -89,7 +139,8 @@ function bumpWatermarkFromServerRows(authStore, serverRows) {
   }
 }
 
-function bumpWatermarkFromLocalIfStillEmpty(authStore, stickerStore) {
+/** Baseline для инкрементального pull; при пустой доске — «сейчас», иначе после epoch-wipe/clear нет `since` и pull не ходит. */
+export function bumpWatermarkFromLocalIfStillEmpty(authStore, stickerStore) {
   if (readWatermark(authStore)) return
   let max = 0
   for (const s of stickerStore.stickers) {
@@ -102,7 +153,9 @@ function bumpWatermarkFromLocalIfStillEmpty(authStore, stickerStore) {
   }
   if (stickerStore.stickers.length > 0) {
     writeWatermark(authStore, new Date().toISOString())
+    return
   }
+  writeWatermark(authStore, new Date().toISOString())
 }
 
 function bumpWatermarkCombined(authStore, stickerRows, removedRows) {
@@ -154,7 +207,7 @@ function contentPayloadFromLocal(sticker) {
     folded: !!sticker.folded,
     bc: sticker.bc,
     font: sticker.font,
-    fs: sticker.fs,
+    fs: clampStickerFontSize(sticker.fs),
     tc: sticker.tc
   }
   if (STICKER.SYNC_INCLUDE_LAYOUT) {
@@ -459,7 +512,21 @@ async function runIncrementalPullImpl() {
   const rows = res.ok && data?.stickers ? data.stickers : []
   const removedRows = rRem.ok && dRem?.removed ? dRem.removed : []
 
-  if (!rows.length && !removedRows.length) return
+  if (res.ok && data?.board_epoch != null) {
+    const be = Number(data.board_epoch)
+    if (!Number.isNaN(be)) {
+      const wiped = await tryApplyRemoteBoardEpochWipe(auth, be, rows, removedRows.length)
+      if (wiped) return
+    }
+  }
+
+  if (!rows.length && !removedRows.length) {
+    if (res.ok && data?.board_epoch != null) {
+      const be = Number(data.board_epoch)
+      if (!Number.isNaN(be)) writeStoredBoardEpoch(auth, be)
+    }
+    return
+  }
 
   let maxId = store.stickers.reduce((m, s) => Math.max(m, s.id || 0), 0)
 
@@ -536,6 +603,11 @@ async function runAuthenticatedBoardSyncImpl() {
   const localList = [...store.stickers]
 
   const serverList = data.stickers
+  const boardEpoch = Number(data?.board_epoch ?? 0)
+
+  const epochWiped = await tryApplyRemoteBoardEpochWipe(auth, boardEpoch, serverList, 0)
+  if (epochWiped) return
+
   const gestureT = sync.boardLayoutGestureToken
   const watermarkRows =
     gestureT != null && gestureT !== ''
@@ -661,6 +733,10 @@ async function runAuthenticatedBoardSyncImpl() {
 
   bumpWatermarkCombined(auth, watermarkRows, removedRowsForBump)
   bumpWatermarkFromLocalIfStillEmpty(auth, store)
+
+  if (getBoardEpochStorageKey(auth)) {
+    writeStoredBoardEpoch(auth, boardEpoch)
+  }
 }
 
 function drainRemoteQueueAndResync() {

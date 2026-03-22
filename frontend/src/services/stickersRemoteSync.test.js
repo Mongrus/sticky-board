@@ -108,7 +108,7 @@ beforeEach(async () => {
 
   stickersApiMocks.apiStickersList.mockResolvedValue({
     res: { ok: true, status: 200 },
-    data: { stickers: [] }
+    data: { stickers: [], board_epoch: 0 }
   })
   stickersApiMocks.apiStickersRemovedSince.mockResolvedValue({
     res: { ok: true, status: 200 },
@@ -328,6 +328,30 @@ describe('stickersRemoteSync', () => {
     expect(loadOutboxOps(mockAuth)).toHaveLength(0)
   })
 
+  it('runAuthenticatedBoardSync: board_epoch bump with empty server clears local stickers', async () => {
+    localStorage.setItem('stycky-board-epoch-user-42', '0')
+    mockMain.stickers.push(baseSticker({ token: 'aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee' }))
+    stickersApiMocks.apiStickersList.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: { stickers: [], board_epoch: 1 }
+    })
+    await runAuthenticatedBoardSync()
+    expect(mockMain.stickers).toHaveLength(0)
+    expect(mockMain.nextId).toBe(1)
+    expect(localStorage.getItem('stycky-board-epoch-user-42')).toBe('1')
+  })
+
+  it('runAuthenticatedBoardSync: first sync prevEpoch null does not wipe on empty server', async () => {
+    mockMain.stickers.push(baseSticker())
+    stickersApiMocks.apiStickersList.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: { stickers: [], board_epoch: 0 }
+    })
+    await runAuthenticatedBoardSync()
+    expect(mockMain.stickers.length).toBe(1)
+    expect(stickersApiMocks.apiStickerCreate).toHaveBeenCalled()
+  })
+
   it('pullStickersSinceWatermark: adds new remote sticker', async () => {
     localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
     stickersApiMocks.apiStickersList.mockImplementation(async (params) => {
@@ -335,6 +359,7 @@ describe('stickersRemoteSync', () => {
         return {
           res: { ok: true, status: 200 },
           data: {
+            board_epoch: 0,
             stickers: [
               {
                 uuid: 'cccccccc-cccc-4ccc-cccc-cccccccccccc',
@@ -347,7 +372,7 @@ describe('stickersRemoteSync', () => {
           }
         }
       }
-      return { res: { ok: true, status: 200 }, data: { stickers: [] } }
+      return { res: { ok: true, status: 200 }, data: { stickers: [], board_epoch: 0 } }
     })
 
     await pullStickersSinceWatermark()
@@ -374,6 +399,7 @@ describe('stickersRemoteSync', () => {
     stickersApiMocks.apiStickersList.mockResolvedValue({
       res: { ok: true, status: 200 },
       data: {
+        board_epoch: 0,
         stickers: [
           {
             uuid: token,
@@ -416,6 +442,7 @@ describe('stickersRemoteSync', () => {
     stickersApiMocks.apiStickersList.mockResolvedValueOnce({
       res: { ok: true, status: 200 },
       data: {
+        board_epoch: 0,
         stickers: [
           {
             uuid: token,
@@ -457,7 +484,7 @@ describe('stickersRemoteSync', () => {
 
     stickersApiMocks.apiStickersList.mockResolvedValueOnce({
       res: { ok: true, status: 200 },
-      data: { stickers: [] }
+      data: { stickers: [], board_epoch: 0 }
     })
     stickersApiMocks.apiStickersRemovedSince.mockResolvedValueOnce({
       res: { ok: true, status: 200 },
@@ -477,6 +504,24 @@ describe('stickersRemoteSync', () => {
     expect(mockMain.nextId).toBe(1)
   })
 
+  it('pullStickersSinceWatermark: board_epoch bump with empty delta clears local', async () => {
+    localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
+    localStorage.setItem('stycky-board-epoch-user-42', '0')
+    mockMain.stickers.push(baseSticker({ token: 'aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee' }))
+    stickersApiMocks.apiStickersList.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: { stickers: [], board_epoch: 1 }
+    })
+    stickersApiMocks.apiStickersRemovedSince.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: { removed: [] }
+    })
+    await pullStickersSinceWatermark()
+    expect(mockMain.stickers).toHaveLength(0)
+    expect(mockMain.nextId).toBe(1)
+    expect(localStorage.getItem('stycky-board-epoch-user-42')).toBe('1')
+  })
+
   it('pullStickersSinceWatermark: no content merge while board text edit token set', async () => {
     localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
     const token = 'ffffffff-ffff-4fff-ffff-ffffffffffff'
@@ -492,6 +537,7 @@ describe('stickersRemoteSync', () => {
     stickersApiMocks.apiStickersList.mockResolvedValueOnce({
       res: { ok: true, status: 200 },
       data: {
+        board_epoch: 0,
         stickers: [
           {
             uuid: token,

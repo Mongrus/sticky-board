@@ -29,6 +29,7 @@ class StickerTest extends TestCase
         $this->patchJson('/api/stickers/'.Str::uuid()->toString(), [])->assertUnauthorized();
         $this->deleteJson('/api/stickers/'.Str::uuid()->toString())->assertUnauthorized();
         $this->getJson('/api/stickers/removed?since='.now()->toIso8601String())->assertUnauthorized();
+        $this->postJson('/api/stickers/clear-board')->assertUnauthorized();
     }
 
     public function test_user_can_list_empty_stickers(): void
@@ -38,7 +39,8 @@ class StickerTest extends TestCase
         $this->actingAs($user)
             ->getJson('/api/stickers')
             ->assertOk()
-            ->assertJsonPath('stickers', []);
+            ->assertJsonPath('stickers', [])
+            ->assertJsonPath('board_epoch', 0);
     }
 
     public function test_user_can_create_sticker_with_client_uuid(): void
@@ -111,6 +113,35 @@ class StickerTest extends TestCase
             ->assertJsonPath('sticker.x', 99);
 
         $this->assertSame('new', $sticker->fresh()->text);
+    }
+
+    public function test_user_can_patch_sticker_fs_in_allowed_range(): void
+    {
+        $user = User::factory()->create();
+        $sticker = Sticker::factory()->for($user)->create(['fs' => 14]);
+
+        $this->actingAs($user)
+            ->patchJson('/api/stickers/'.$sticker->uuid, ['fs' => 120])
+            ->assertOk()
+            ->assertJsonPath('sticker.fs', 120);
+
+        $this->assertSame(120, $sticker->fresh()->fs);
+    }
+
+    public function test_patch_sticker_fs_out_of_range_is_unprocessable(): void
+    {
+        $user = User::factory()->create();
+        $sticker = Sticker::factory()->for($user)->create();
+
+        $this->actingAs($user)
+            ->patchJson('/api/stickers/'.$sticker->uuid, ['fs' => 0])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['fs']);
+
+        $this->actingAs($user)
+            ->patchJson('/api/stickers/'.$sticker->uuid, ['fs' => 121])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['fs']);
     }
 
     public function test_user_can_delete_own_sticker(): void
@@ -237,5 +268,42 @@ class StickerTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'stickers')
             ->assertJsonPath('stickers.0.uuid', $sticker->uuid);
+    }
+
+    public function test_clear_board_hard_deletes_all_stickers_and_resets_display_id(): void
+    {
+        $user = User::factory()->create();
+        Sticker::factory()->for($user)->create();
+        Sticker::factory()->for($user)->create();
+        $soft = Sticker::factory()->for($user)->create();
+        $soft->delete();
+
+        $this->actingAs($user)
+            ->postJson('/api/stickers/clear-board')
+            ->assertOk()
+            ->assertJson(['ok' => true, 'board_epoch' => 1]);
+
+        $this->assertSame(1, $user->fresh()->stickers_board_epoch);
+        $this->assertSame(0, Sticker::withTrashed()->where('user_id', $user->id)->count());
+
+        $this->actingAs($user)
+            ->postJson('/api/stickers', ['text' => 'fresh'])
+            ->assertCreated()
+            ->assertJsonPath('sticker.display_id', 1)
+            ->assertJsonPath('sticker.text', 'fresh');
+    }
+
+    public function test_clear_board_does_not_affect_other_users(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        Sticker::factory()->for($owner)->create();
+        Sticker::factory()->for($other)->create();
+
+        $this->actingAs($owner)->postJson('/api/stickers/clear-board')->assertOk();
+
+        $this->assertSame(0, Sticker::where('user_id', $owner->id)->count());
+        $this->assertSame(1, Sticker::where('user_id', $other->id)->count());
+        $this->assertSame(0, $other->fresh()->stickers_board_epoch);
     }
 }

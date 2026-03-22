@@ -1,18 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { STICKER, STICKER_COLORS } from '@/constants/sticker.constants';
+import { STICKER, STICKER_COLORS, clampStickerFontSize } from '@/constants/sticker.constants';
 import { COOKIE_CONSENT_KEY } from '@/constants/app.constants';
 import { generateStickerToken, stickerNowIso } from '@/utils/stickerIdentity'
 import { STICKERS_STORE_GUEST_KEY } from '@/constants/storage.constants'
 import { mergeGuestBoardLww } from '@/utils/mergeGuestBoardLww'
 import { useAuthStore } from '@/stores/auth.store'
 import { clearOutbox } from '@/services/stickersOutbox'
+import { apiStickersClearBoard } from '@/services/stickersApi'
+import { getBoardEpochStorageKey, getPullWatermarkStorageKey } from '@/constants/storage.constants'
+import { useSyncStore } from '@/stores/sync.store'
 import {
   scheduleStickerRemotePatch,
   flushStickerRemotePatchNow,
   pushNewStickerToServer,
   deleteStickerOnServer,
-  snapStickerLayoutInPlace
+  snapStickerLayoutInPlace,
+  bumpWatermarkFromLocalIfStillEmpty
 } from '@/services/stickersRemoteSync';
 
 const DEFAULT_SETTINGS = {
@@ -161,17 +165,40 @@ export const useMainStore = defineStore('stickers', () => {
         }
     }
 
-    function clearBoard() {
+    async function clearBoard() {
         const auth = useAuthStore()
         if (auth.isAuthenticated) {
             clearOutbox(auth)
-            for (const s of [...stickers.value]) {
-                if (s.token) void deleteStickerOnServer(s.token)
+            try {
+                const { res, data } = await apiStickersClearBoard()
+                if (!res.ok) {
+                    useSyncStore().setError()
+                    confirmClearBoard.value = false
+                    return
+                }
+                if (typeof window !== 'undefined') {
+                    const ek = getBoardEpochStorageKey(auth)
+                    const epoch = Number(data?.board_epoch)
+                    if (ek && !Number.isNaN(epoch)) {
+                        localStorage.setItem(ek, String(epoch))
+                    }
+                }
+            } catch {
+                useSyncStore().setError()
+                confirmClearBoard.value = false
+                return
+            }
+            if (typeof window !== 'undefined') {
+                const wk = getPullWatermarkStorageKey(auth)
+                if (wk) localStorage.removeItem(wk)
             }
         }
         nextId.value = 1
         stickers.value = []
         deletedStickers.value = []
+        if (auth.isAuthenticated) {
+            bumpWatermarkFromLocalIfStillEmpty(auth, { stickers: stickers.value })
+        }
         confirmClearBoard.value = false
     }
 
@@ -186,6 +213,10 @@ export const useMainStore = defineStore('stickers', () => {
                 stickers.value = data.stickers || []
                 nextId.value = data.nextId || 1
                 settings.value = { ...DEFAULT_SETTINGS, ...(data.settings || {}) }
+                settings.value.fontSize = clampStickerFontSize(
+                    settings.value.fontSize,
+                    DEFAULT_SETTINGS.fontSize
+                )
                 if (data.cookiesConfirmed) {
                     cookiesConfirmed.value = true
                     if (!fromCookieKey) localStorage.setItem(COOKIE_CONSENT_KEY, 'true')
@@ -240,6 +271,7 @@ export const useMainStore = defineStore('stickers', () => {
             if (s.updated_at == null || s.updated_at === '') {
                 s.updated_at = now
             }
+            s.fs = clampStickerFontSize(s.fs, DEFAULT_SETTINGS.fontSize)
         }
     }
 

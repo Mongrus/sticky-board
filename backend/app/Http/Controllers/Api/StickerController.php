@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Sticker;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -30,8 +31,11 @@ class StickerController extends Controller
 
         $stickers = $query->get()->map(fn (Sticker $s) => $this->toApiArray($s));
 
+        $request->user()->refresh();
+
         return response()->json([
             'stickers' => $stickers,
+            'board_epoch' => (int) $request->user()->stickers_board_epoch,
         ]);
     }
 
@@ -55,6 +59,28 @@ class StickerController extends Controller
 
         return response()->json([
             'removed' => $removed,
+        ]);
+    }
+
+    /**
+     * Полное удаление всех стикеров пользователя (включая корзину soft delete).
+     * Одна операция вместо N× DELETE; после этого следующий display_id снова с 1.
+     */
+    public function clearBoard(Request $request): JsonResponse
+    {
+        $userId = $request->user()->id;
+
+        DB::transaction(function () use ($userId): void {
+            $user = User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+            DB::table('stickers')->where('user_id', $userId)->delete();
+            $user->increment('stickers_board_epoch');
+        });
+
+        $request->user()->refresh();
+
+        return response()->json([
+            'ok' => true,
+            'board_epoch' => (int) $request->user()->stickers_board_epoch,
         ]);
     }
 
@@ -184,7 +210,7 @@ class StickerController extends Controller
             'h' => ['sometimes', 'integer', 'min:50', 'max:4000'],
             'bc' => ['sometimes', 'string', 'max:64'],
             'font' => ['sometimes', 'string', 'max:255'],
-            'fs' => ['sometimes', 'integer', 'min:6', 'max:96'],
+            'fs' => ['sometimes', 'integer', 'min:1', 'max:120'],
             'tc' => ['sometimes', 'string', 'max:32'],
             'z' => ['sometimes', 'integer', 'min:0', 'max:2147483647'],
         ];

@@ -1,5 +1,6 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
+import { STICKER, clampStickerFontSize } from '@/constants/sticker.constants';
 import { ref, watch, onUnmounted } from 'vue';
 
 const props = defineProps({
@@ -36,13 +37,13 @@ onUnmounted(() => {
     document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
 
-const localFontSize = ref(store.settings.fontSize);
+const localFontSize = ref(clampStickerFontSize(store.settings.fontSize));
 const localHeight = ref(store.settings.height);
 const localWidth = ref(store.settings.width);
 const localBackgroundColor = ref(store.settings.backgroundColor);
 
 watch(() => store.settings.fontSize, (newVal) => {
-    localFontSize.value = newVal;
+    localFontSize.value = clampStickerFontSize(newVal);
 });
 
 watch(() => store.settings.height, (newVal) => {
@@ -58,7 +59,9 @@ watch(() => store.settings.backgroundColor, (newVal) => {
 });
 
 function updateFontSize() {
-    store.settings.fontSize = localFontSize.value;
+    const c = clampStickerFontSize(localFontSize.value)
+    localFontSize.value = c
+    store.settings.fontSize = c
 }
 
 function updateHeight() {
@@ -92,7 +95,13 @@ function resetToDefaults() {
             </div>
             <div class="setting-item">
                 <label>🔤 Размер шрифта:</label>
-                <input type="number" v-model="localFontSize" @blur="updateFontSize" min="1">
+                <input
+                    type="number"
+                    v-model.number="localFontSize"
+                    :min="STICKER.FONT_SIZE_MIN"
+                    :max="STICKER.FONT_SIZE_MAX"
+                    @blur="updateFontSize"
+                >
             </div>
             <div class="setting-item">
                 <label>📏 Высота:</label>

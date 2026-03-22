@@ -18,6 +18,7 @@ Route::get('/user', [AuthController::class, 'user'])->middleware('auth:sanctum')
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/stickers/removed', [StickerController::class, 'removedSince']);
+    Route::post('/stickers/clear-board', [StickerController::class, 'clearBoard']);
     Route::get('/stickers', [StickerController::class, 'index']);
     Route::post('/stickers', [StickerController::class, 'store']);
     Route::patch('/stickers/{uuid}', [StickerController::class, 'update'])->whereUuid('uuid');

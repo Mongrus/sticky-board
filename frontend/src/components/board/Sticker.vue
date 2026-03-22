@@ -1,7 +1,7 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
 import { useSyncStore } from '@/stores/sync.store';
-import { STICKER, STICKER_COLORS, STICKER_FONTS } from '@/constants/sticker.constants';
+import { STICKER, STICKER_COLORS, STICKER_FONTS, clampStickerFontSize } from '@/constants/sticker.constants';
 import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue';
 
 const store = useMainStore();
@@ -50,7 +50,7 @@ const {sticker} = defineProps({
 
 const localText = ref(sticker.text);
 const localFont = ref(sticker.font);
-const localFontSize = ref(sticker.fs);
+const localFontSize = ref(clampStickerFontSize(sticker.fs));
 
 watch(() => sticker.text, (newVal) => {
     localText.value = newVal;
@@ -61,7 +61,7 @@ watch(() => sticker.font, (newVal) => {
 });
 
 watch(() => sticker.fs, (newVal) => {
-    localFontSize.value = newVal;
+    localFontSize.value = clampStickerFontSize(newVal);
 });
 
 function updateText() {
@@ -100,7 +100,9 @@ function updateFont() {
 }
 
 function updateFontSize() {
-    sticker.fs = localFontSize.value;
+    const c = clampStickerFontSize(localFontSize.value)
+    localFontSize.value = c
+    sticker.fs = c
     store.bumpStickerUpdatedAt(sticker.id);
 }
 
@@ -416,7 +418,13 @@ function changingStickerSettings() {
                         <option v-for="font in STICKER_FONTS" :value="font.value">{{ font.label }}</option>
                     </select>
                     <label>Размер шрифта:</label>
-                    <input type="number" v-model.number="localFontSize" @input="updateFontSize">
+                    <input
+                        type="number"
+                        v-model.number="localFontSize"
+                        :min="STICKER.FONT_SIZE_MIN"
+                        :max="STICKER.FONT_SIZE_MAX"
+                        @input="updateFontSize"
+                    >
                 </div>
             </div>
         </Transition>

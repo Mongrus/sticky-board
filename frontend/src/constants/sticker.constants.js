@@ -1,6 +1,9 @@
 export const STICKER = {
   MIN_WIDTH: 100,
   MIN_HEIGHT: 50,
+  /** Размер шрифта стикера (px); совпадает с валидацией API `fs`. */
+  FONT_SIZE_MIN: 1,
+  FONT_SIZE_MAX: 120,
   TEXT_SAVE_DEBOUNCE_MS: 350,
   REMOTE_PATCH_DEBOUNCE_MS: 400,
   /** Инкрементальный pull с сервера (видимая вкладка, залогинен, онлайн). */
@@ -8,6 +11,13 @@ export const STICKER = {
   SYNC_INCLUDE_LAYOUT: true,
   /** Поверх остальных стикеров во время drag/resize (z в сторе — только после pointerup). */
   DRAG_GESTURE_Z_INDEX: 2_147_483_000
+}
+
+/** Целое в [FONT_SIZE_MIN, FONT_SIZE_MAX] для API и инпутов; невалидное значение → defaultFs. */
+export function clampStickerFontSize(value, defaultFs = 14) {
+  const n = Math.round(Number(value))
+  if (Number.isNaN(n)) return defaultFs
+  return Math.max(STICKER.FONT_SIZE_MIN, Math.min(STICKER.FONT_SIZE_MAX, n))
 }
 
 export const STICKER_COLORS = [

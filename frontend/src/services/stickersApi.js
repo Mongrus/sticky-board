@@ -35,3 +35,9 @@ export async function apiStickerPatch(uuid, body) {
 export async function apiStickerDelete(uuid) {
   return apiRequest(`/api/stickers/${uuid}`, { method: 'DELETE' })
 }
+
+/** Полное удаление всех стикеров аккаунта (жёсткое на сервере). Тело запроса не используется. */
+export async function apiStickersClearBoard() {
+  const res = await apiRequest('/api/stickers/clear-board', { method: 'POST' })
+  return { res, data: res.ok ? await res.json().catch(() => ({})) : null }
+}
