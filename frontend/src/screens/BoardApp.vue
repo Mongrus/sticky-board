@@ -16,11 +16,15 @@ import {
   BOARD_MAX_STICKER_RIGHT_MOBILE,
   BOARD_MAX_STICKER_BOTTOM_MOBILE
 } from '@/constants/board.constants';
+import { clampStickerLayoutToBoardBounds } from '@/utils/boardLayoutClamp';
+import { setBoardPlayableClientSize } from '@/utils/boardPlayableSize';
 
 const store = useMainStore();
 const activeGeneralSettings = ref(false);
 
 const boardViewportRef = ref(null);
+const boardRef = ref(null);
+let boardResizeObserver = null;
 
 function mobileBoardMql() {
   return typeof window !== 'undefined'
@@ -95,6 +99,22 @@ function onWindowResizeForBoard() {
   requestAnimationFrame(clampBoardViewportScroll);
 }
 
+function reclampAllStickersToBoard() {
+  for (const s of store.stickers) {
+    clampStickerLayoutToBoardBounds(s);
+  }
+}
+
+/** Десктоп: границы стикеров = видимый .board; мобилка — константы в getBoardStickerMaxExtents. */
+function applyBoardPlayableSizeAndClamp() {
+  const el = boardRef.value;
+  if (!el) return;
+  if (!isMobileBoardLayout.value) {
+    setBoardPlayableClientSize(el.clientWidth, el.clientHeight);
+  }
+  reclampAllStickersToBoard();
+}
+
 onMounted(() => {
   syncMobileBoardLayoutFlag();
   mobileLayoutMql = mobileBoardMql();
@@ -107,12 +127,20 @@ onMounted(() => {
   } else {
     requestAnimationFrame(clampBoardViewportScroll);
   }
+  applyBoardPlayableSizeAndClamp();
   const el = boardViewportRef.value;
   if (el && typeof ResizeObserver !== 'undefined') {
     viewportResizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(clampBoardViewportScroll);
     });
     viewportResizeObserver.observe(el);
+  }
+  const boardEl = boardRef.value;
+  if (boardEl && typeof ResizeObserver !== 'undefined') {
+    boardResizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(applyBoardPlayableSizeAndClamp);
+    });
+    boardResizeObserver.observe(boardEl);
   }
   el?.addEventListener('scroll', onBoardViewportScroll, { passive: true });
   window.addEventListener('resize', onWindowResizeForBoard);
@@ -123,11 +151,13 @@ onUnmounted(() => {
   mobileLayoutMql?.removeEventListener('change', onMobileLayoutMqlChange);
   boardViewportRef.value?.removeEventListener('scroll', onBoardViewportScroll);
   window.removeEventListener('resize', onWindowResizeForBoard);
+  boardResizeObserver?.disconnect();
+  boardResizeObserver = null;
 });
 
 const boardSizeStyle = computed(() => {
   if (!isMobileBoardLayout.value) {
-    return { width: '100%', height: '100%' };
+    return { width: '100%', flex: '1 1 0', minHeight: 0 };
   }
   return {
     width: `${BOARD_MOBILE_CANVAS_WIDTH_PX}px`,
@@ -184,6 +214,7 @@ function createStickerOnDoubleClick(event) {
         :class="{ 'board-viewport--pannable': isMobileBoardLayout }"
       >
         <div
+          ref="boardRef"
           class="board"
           :class="{ 'board--mobile-canvas': isMobileBoardLayout }"
           :style="[boardSizeStyle, mobileBoundsGuideStyle]"
@@ -258,24 +289,49 @@ main
   position: relative
   z-index: 0
 
+// Десктоп: узор как на welcome/login — на вьюпорте под прозрачной .board
+.board-viewport:not(.board-viewport--pannable)
+  display: flex
+  flex-direction: column
+
+.board-viewport:not(.board-viewport--pannable)::before
+  content: ''
+  position: absolute
+  inset: 0
+  z-index: 0
+  pointer-events: none
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.06) 1px, transparent 1px)
+  background-size: 20px 20px
+
 .board-viewport--pannable
   overflow: scroll
   scrollbar-gutter: stable
   -webkit-overflow-scrolling: touch
   overscroll-behavior: contain
 
-.board
-  background: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)
+// Мобилка: узор на полотне (скроллится с доской), те же значения, что в welcome / auth-screen
+.board-viewport--pannable .board::before
+  content: ''
+  position: absolute
+  inset: 0
+  z-index: 0
+  pointer-events: none
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.06) 1px, transparent 1px)
   background-size: 20px 20px
+
+.board
   position: relative
+  z-index: 1
   box-sizing: border-box
-  isolation: isolate
-  flex-shrink: 0
 
 .board__playable
   position: relative
+  z-index: 1
   width: 100%
   height: 100%
+  &:not(.board__playable--mobile)
+    min-height: 100%
+    min-width: 100%
 
 // На мобилке координаты стикеров как на десктопе (0…); сдвиг только визуальный
 .board__playable--mobile
@@ -286,6 +342,7 @@ main
   height: var(--board-mobile-playable-h)
 
 .board--mobile-canvas
+  flex-shrink: 0
   // в тон тулбару / кнопке настроек (#7A8798), не «тревожный» красный
   box-shadow: 0 0 0 1px rgba(122, 135, 152, 0.4)
 
@@ -299,5 +356,5 @@ main
   box-sizing: border-box
   border: 2px solid rgba(122, 135, 152, 0.55)
   pointer-events: none
-  z-index: 1
+  z-index: 2
 </style>

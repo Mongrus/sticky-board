@@ -2,6 +2,8 @@
 import { useMainStore } from '@/stores/main.store';
 import { useSyncStore } from '@/stores/sync.store';
 import { STICKER, STICKER_COLORS, STICKER_FONTS, clampStickerFontSize } from '@/constants/sticker.constants';
+import { getBoardStickerMaxExtents } from '@/constants/board.constants';
+import { clampStickerLayoutToBoardBounds } from '@/utils/boardLayoutClamp';
 import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue';
 
 const store = useMainStore();
@@ -139,6 +141,19 @@ let resizing = false
 /** Порог в px: без него pointerdown с textarea не доходит до .sticker (нужен bubble), но тогда каждый клик начинал бы драг. */
 const STICKER_DRAG_THRESHOLD_PX = 8
 
+function clampStickerDragDelta(dx, dy, s) {
+  const { right: maxR, bottom: maxB, minX, minY } = getBoardStickerMaxExtents()
+  const w = Math.max(STICKER.MIN_WIDTH, Math.round(Number(s.w)) || STICKER.MIN_WIDTH)
+  const h = Math.max(STICKER.MIN_HEIGHT, Math.round(Number(s.h)) || STICKER.MIN_HEIGHT)
+  const maxX = Math.max(minX, maxR - w)
+  const maxY = Math.max(minY, maxB - h)
+  let nx = s.x + dx
+  let ny = s.y + dy
+  nx = Math.max(minX, Math.min(maxX, nx))
+  ny = Math.max(minY, Math.min(maxY, ny))
+  return { dx: nx - s.x, dy: ny - s.y }
+}
+
 function moveSticker(e, id) {
 
     if (resizing) return
@@ -169,8 +184,11 @@ function moveSticker(e, id) {
     const move = (ev) => {
         tryCommitDrag(ev)
         if (!dragCommitted) return
-        dx = ev.clientX - startX
-        dy = ev.clientY - startY
+        const rawDx = ev.clientX - startX
+        const rawDy = ev.clientY - startY
+        const c = clampStickerDragDelta(rawDx, rawDy, sticker)
+        dx = c.dx
+        dy = c.dy
         if (rafId === null) {
             rafId = requestAnimationFrame(() => {
                 dragDelta.value = { dx, dy }
@@ -293,12 +311,15 @@ function resizeSticker(e, id, corner) {
             }
         }
 
-        finalW = w
-        finalH = h
-        finalX = x
-        finalY = y
+        const ghost = { x, y, w, h }
+        clampStickerLayoutToBoardBounds(ghost)
 
-        resizePreview.value = { x, y, w, h }
+        finalW = ghost.w
+        finalH = ghost.h
+        finalX = ghost.x
+        finalY = ghost.y
+
+        resizePreview.value = { x: ghost.x, y: ghost.y, w: ghost.w, h: ghost.h }
     }
 
     const stop = (ev) => {

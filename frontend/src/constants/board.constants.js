@@ -1,10 +1,13 @@
+import { STICKER } from '@/constants/sticker.constants'
+import { boardPlayableClientSize } from '@/utils/boardPlayableSize'
+
 /** Запас справа/снизу за последним стикером (мобильное полотно). */
 export const BOARD_EDGE_PADDING = 72
 
 /** Панорама и лимиты координат только при max-width ≤ этого значения. */
 export const BOARD_MOBILE_LAYOUT_MAX_WIDTH_PX = 768
 
-/** Десктоп: правый/нижний край стикера (px). */
+/** Десктоп: запас по умолчанию до первого измерения .board (см. boardPlayableSize). */
 export const BOARD_MAX_STICKER_RIGHT = 2560
 export const BOARD_MAX_STICKER_BOTTOM = 1920
 
@@ -32,9 +35,13 @@ export function getBoardStickerMaxExtents() {
       minY: 0
     }
   }
+  const bw = boardPlayableClientSize.value.width
+  const bh = boardPlayableClientSize.value.height
+  const right = bw > 0 ? bw : BOARD_MAX_STICKER_RIGHT
+  const bottom = bh > 0 ? bh : BOARD_MAX_STICKER_BOTTOM
   return {
-    right: BOARD_MAX_STICKER_RIGHT,
-    bottom: BOARD_MAX_STICKER_BOTTOM,
+    right: Math.max(STICKER.MIN_WIDTH, right),
+    bottom: Math.max(STICKER.MIN_HEIGHT, bottom),
     minX: 0,
     minY: 0
   }

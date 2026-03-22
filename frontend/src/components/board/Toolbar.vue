@@ -47,20 +47,17 @@ const syncLabel = computed(() => {
     }
 })
 
-/** На узком экране — только «лампочка»: зелёная ок, красная ошибка, серая офлайн/гость/синк. */
+/** Узкий экран — яркая лампа статуса (синхронизация = акцент приложения #5C9CFF). */
 const syncLampClass = computed(() => {
-    if (authStore.isGuest) {
-        return 'toolbar__sync-lamp--gray'
-    }
     switch (syncStore.syncStatus) {
         case 'error':
-            return 'toolbar__sync-lamp--red'
+            return 'toolbar__sync-lamp--error'
         case 'offline':
-            return 'toolbar__sync-lamp--gray'
+            return 'toolbar__sync-lamp--offline'
         case 'syncing':
-            return 'toolbar__sync-lamp--gray toolbar__sync-lamp--pulse'
+            return 'toolbar__sync-lamp--syncing toolbar__sync-lamp--pulse'
         default:
-            return 'toolbar__sync-lamp--green'
+            return 'toolbar__sync-lamp--ok'
     }
 })
 
@@ -184,7 +181,6 @@ const DRAG_THRESHOLD = 10;
 
 function startDrag(e) {
     const el = e.currentTarget;
-    const initialTarget = e.target;
     const startX = e.clientX;
     const startY = e.clientY;
     const initialX = toolbarPosition.value.x;
@@ -216,11 +212,6 @@ function startDrag(e) {
         }
         if (moved) {
             toolbarPosition.value = clampPosition({ ...toolbarPosition.value, x: initialX + dx });
-        } else {
-            const btn = initialTarget.closest('button');
-            const link = initialTarget.closest('a');
-            if (btn) btn.click();
-            else if (link) link.click();
         }
         el.style.transform = `translate(${toolbarPosition.value.x}px, ${toolbarPosition.value.y}px)`;
         window.removeEventListener('pointermove', move);
@@ -285,6 +276,7 @@ function startDrag(e) {
         <div class="toolbar__divider toolbar__divider--wide" aria-hidden="true"></div>
         <button 
             class="toolbar__btn-create"
+            @pointerdown.stop
             @click="store.createSticker(
             store.nextId,
             '',
@@ -302,11 +294,12 @@ function startDrag(e) {
         <button
             class="toolbar__btn-settings"
             :class="{ active: activeGeneralSettings }"
+            @pointerdown.stop
             @click="emit('toggleSettings')"
             aria-label="Настройки"
         >&#9881;</button>
         <div class="toolbar__divider" aria-hidden="true"></div>
-        <button class="toolbar__btn-clear" @click="store.confirmClearBoard = true" aria-label="Очистить доску">&#8855;</button>
+        <button class="toolbar__btn-clear" @pointerdown.stop @click="store.confirmClearBoard = true" aria-label="Очистить доску">&#8855;</button>
     </div>
 </template>
 
@@ -323,21 +316,93 @@ function startDrag(e) {
 
 .toolbar__sync-lamp
     flex-shrink: 0
+    position: relative
+    z-index: 1
     width: 14px
     height: 14px
     border-radius: 50%
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12)
-    &--green
-        background: #2e7d32
-    &--red
-        background: #c62828
-    &--gray
-        background: #9e9e9e
-    &--pulse
-        animation: toolbar-sync-lamp-pulse 1s ease-in-out infinite
+    border: 1px solid rgba(255, 255, 255, 0.4)
+    // «Тление»: внешнее свечение (box-shadow) — не для офлайна
+    &--ok
+        background: linear-gradient(160deg, #2ee59d 0%, #0eb87a 100%)
+        animation: toolbar-sync-lamp-breathe 3.2s ease-in-out infinite, toolbar-sync-lamp-ember-ok 2.5s ease-in-out infinite
+    &--offline
+        background: linear-gradient(160deg, #ffc53d 0%, #f59e0b 100%)
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18)
+        animation: none
+    &--syncing
+        background: linear-gradient(160deg, #7eb6ff 0%, #5c9cff 100%)
+    &--syncing.toolbar__sync-lamp--pulse
+        animation: toolbar-sync-lamp-syncing 1.25s ease-in-out infinite, toolbar-sync-lamp-ember-syncing 1.65s ease-in-out infinite
+    &--error
+        background: linear-gradient(160deg, #ff6b86 0%, #e91e4d 100%)
+        animation: toolbar-sync-lamp-breathe 3.2s ease-in-out infinite, toolbar-sync-lamp-ember-error 2.35s ease-in-out infinite
 
-@keyframes toolbar-sync-lamp-pulse
+// Мягкое ореол-свечение вокруг лампы (только не офлайн)
+.toolbar__sync-lamp:not(.toolbar__sync-lamp--offline)::before
+    content: ''
+    position: absolute
+    inset: -7px
+    border-radius: 50%
+    z-index: -1
+    pointer-events: none
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, transparent 65%)
+    animation: toolbar-sync-lamp-halo 3s ease-in-out infinite
+
+@keyframes toolbar-sync-lamp-breathe
+    0%, 100%
+        opacity: 1
+        transform: scale(1)
     50%
+        opacity: 0.9
+        transform: scale(0.97)
+
+@keyframes toolbar-sync-lamp-syncing
+    0%, 100%
+        opacity: 1
+        transform: scale(1)
+    50%
+        opacity: 0.78
+        transform: scale(0.94)
+
+@keyframes toolbar-sync-lamp-halo
+    0%, 100%
+        opacity: 0.55
+        transform: scale(1)
+    50%
+        opacity: 0.9
+        transform: scale(1.08)
+
+@keyframes toolbar-sync-lamp-ember-ok
+    0%, 100%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 10px 2px rgba(46, 230, 157, 0.55), 0 0 24px 6px rgba(14, 184, 122, 0.3), 0 0 2px 1px rgba(255, 248, 220, 0.5) inset
+    35%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 16px 4px rgba(255, 230, 150, 0.5), 0 0 28px 8px rgba(46, 230, 157, 0.42), 0 0 3px 1px rgba(255, 255, 255, 0.45) inset
+    65%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 8px 2px rgba(180, 255, 210, 0.45), 0 0 20px 5px rgba(14, 184, 122, 0.35), 0 0 2px 1px rgba(255, 220, 120, 0.4) inset
+
+@keyframes toolbar-sync-lamp-ember-syncing
+    0%, 100%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 12px 3px rgba(126, 182, 255, 0.65), 0 0 26px 7px rgba(92, 156, 255, 0.38), 0 0 2px 1px rgba(220, 240, 255, 0.55) inset
+    40%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 18px 5px rgba(200, 230, 255, 0.55), 0 0 32px 9px rgba(92, 156, 255, 0.48), 0 0 3px 2px rgba(255, 255, 255, 0.5) inset
+    70%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 9px 2px rgba(150, 200, 255, 0.5), 0 0 22px 6px rgba(60, 140, 255, 0.32), 0 0 2px 1px rgba(180, 220, 255, 0.45) inset
+
+@keyframes toolbar-sync-lamp-ember-error
+    0%, 100%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 11px 3px rgba(255, 107, 134, 0.58), 0 0 24px 6px rgba(233, 30, 77, 0.32), 0 0 2px 1px rgba(255, 220, 200, 0.45) inset
+    30%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 16px 4px rgba(255, 180, 100, 0.42), 0 0 30px 8px rgba(255, 80, 100, 0.4), 0 0 3px 1px rgba(255, 240, 220, 0.55) inset
+    60%
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 9px 2px rgba(255, 150, 160, 0.55), 0 0 22px 5px rgba(233, 30, 77, 0.38), 0 0 2px 1px rgba(255, 200, 180, 0.4) inset
+
+@media (prefers-reduced-motion: reduce)
+    .toolbar__sync-lamp
+        animation: none !important
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18) !important
+    .toolbar__sync-lamp::before
+        animation: none !important
         opacity: 0.5
 
 .toolbar__sync-badge
