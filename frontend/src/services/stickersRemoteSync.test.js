@@ -9,6 +9,10 @@ const mockSync = vi.hoisted(() => {
   const o = {
     networkOnline: true,
     syncStatus: 'synced',
+    boardLayoutGestureToken: null,
+    setBoardLayoutGestureToken: vi.fn((token) => {
+      o.boardLayoutGestureToken = token
+    }),
     setError: vi.fn(() => {
       o.syncStatus = 'error'
     }),
@@ -90,6 +94,7 @@ beforeEach(async () => {
   mockAuth.user = { id: 42 }
   mockSync.networkOnline = true
   mockSync.syncStatus = 'synced'
+  mockSync.setBoardLayoutGestureToken(null)
   mockMain.stickers.splice(0, mockMain.stickers.length)
   mockMain.nextId = 10
 
@@ -189,6 +194,46 @@ describe('stickersRemoteSync', () => {
     scheduleStickerRemotePatch(token)
     await vi.advanceTimersByTimeAsync(500)
     expect(stickersApiMocks.apiStickerPatch).toHaveBeenCalled()
+    clearStickerRemotePatchTimers()
+  })
+
+  it('PATCH success keeps local x,y,w,h,z (server echo must not cause layout jump)', async () => {
+    const s = baseSticker({
+      x: 10.3,
+      y: 20.7,
+      w: 120,
+      h: 80,
+      z: 3,
+      text: 'keep-me'
+    })
+    mockMain.stickers.push(s)
+    stickersApiMocks.apiStickerPatch.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      sticker: {
+        updated_at: '2025-07-01T00:00:00.000Z',
+        text: 'from-api',
+        folded: false,
+        x: 999,
+        y: 888,
+        w: 111,
+        h: 222,
+        z: 0
+      }
+    })
+
+    const { flushStickerRemotePatchNow } = await import('@/services/stickersRemoteSync')
+    flushStickerRemotePatchNow(s.token)
+
+    await vi.waitFor(() => {
+      expect(stickersApiMocks.apiStickerPatch).toHaveBeenCalled()
+    })
+
+    expect(s.text).toBe('from-api')
+    expect(s.x).toBe(10.3)
+    expect(s.y).toBe(20.7)
+    expect(s.w).toBe(120)
+    expect(s.h).toBe(80)
+    expect(s.z).toBe(3)
     clearStickerRemotePatchTimers()
   })
 
@@ -312,6 +357,61 @@ describe('stickersRemoteSync', () => {
     await pullStickersSinceWatermark()
 
     expect(stickersApiMocks.apiStickerPatch).toHaveBeenCalledWith(token, expect.any(Object))
+  })
+
+  it('pullStickersSinceWatermark: no API when board layout gesture active (variant B)', async () => {
+    localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
+    mockSync.setBoardLayoutGestureToken('aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee')
+    stickersApiMocks.apiStickersList.mockClear()
+    stickersApiMocks.apiStickersRemovedSince.mockClear()
+
+    await pullStickersSinceWatermark()
+
+    expect(stickersApiMocks.apiStickersList).not.toHaveBeenCalled()
+    expect(stickersApiMocks.apiStickersRemovedSince).not.toHaveBeenCalled()
+  })
+
+  it('pullStickersSinceWatermark: aborts after API if gesture starts before merge (during await gap)', async () => {
+    localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
+    const token = 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee'
+    mockMain.stickers.push(
+      baseSticker({
+        token,
+        text: 'local only',
+        updated_at: '2025-06-01T00:00:00.000Z'
+      })
+    )
+
+    stickersApiMocks.apiStickersList.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: {
+        stickers: [
+          {
+            uuid: token,
+            updated_at: '2025-07-01T00:00:00.000Z',
+            text: 'from server',
+            folded: false
+          }
+        ]
+      }
+    })
+
+    stickersApiMocks.apiStickersRemovedSince.mockImplementationOnce(async () => {
+      mockSync.setBoardLayoutGestureToken(token)
+      return {
+        res: { ok: true, status: 200 },
+        data: { removed: [] }
+      }
+    })
+
+    stickersApiMocks.apiStickerPatch.mockClear()
+
+    await pullStickersSinceWatermark()
+
+    expect(stickersApiMocks.apiStickersList).toHaveBeenCalled()
+    expect(stickersApiMocks.apiStickersRemovedSince).toHaveBeenCalled()
+    expect(mockMain.stickers.find((s) => s.token === token).text).toBe('local only')
+    expect(stickersApiMocks.apiStickerPatch).not.toHaveBeenCalled()
   })
 
   it('guest: pushNewStickerToServer is no-op', async () => {

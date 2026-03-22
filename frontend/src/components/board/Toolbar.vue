@@ -23,7 +23,7 @@ const syncLabel = computed(() => {
         case 'syncing':
             return 'Синхронизация…'
         case 'error':
-            return 'Ошибка синка'
+            return 'Ошибка синхронизации'
         default:
             return authStore.isAuthenticated ? 'Синхронизировано' : 'Локально'
     }

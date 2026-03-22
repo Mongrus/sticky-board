@@ -21,6 +21,37 @@ import {
 /** Нижняя граница для /stickers/removed, если ещё нет watermark (учёт чужих удалений при первом merge). */
 const REMOVED_SINCE_EPOCH = '1970-01-01T00:00:00.000Z'
 
+/** Токены стикеров: локальная геометрия ещё не подтверждена PATCH — не затирать x,y,w,h,z из pull (рассинхрон часов клиент/сервер). */
+const pendingLayoutSyncTokens = new Set()
+
+function markLayoutSyncPending(token) {
+  if (STICKER.SYNC_INCLUDE_LAYOUT && token) pendingLayoutSyncTokens.add(token)
+}
+
+function clearLayoutSyncPending(token) {
+  if (token) pendingLayoutSyncTokens.delete(token)
+}
+
+function shouldSkipLayoutFromServer(local) {
+  if (!STICKER.SYNC_INCLUDE_LAYOUT || !local?.token) return false
+  if (pendingLayoutSyncTokens.has(local.token)) return true
+  const sync = useSyncStore()
+  return sync.boardLayoutGestureToken === local.token
+}
+
+/** Вариант A: пока тянем/ресайзим стикер — не merge и не PATCH из pull (иначе уходит снимок стора с устаревшей геометрией). */
+function isBoardLayoutGestureActiveForToken(token) {
+  if (!token) return false
+  const sync = useSyncStore()
+  return sync.boardLayoutGestureToken === token
+}
+
+/** Вариант B: не начинать/не применять инкрементальный pull, пока на доске активен drag или resize (нет гонки с таймером). */
+function isAnyBoardLayoutGestureActive() {
+  const t = useSyncStore().boardLayoutGestureToken
+  return t != null && t !== ''
+}
+
 async function getMainStore() {
   const { useMainStore } = await import('@/stores/main.store')
   return useMainStore()
@@ -95,6 +126,22 @@ function compareUpdatedAt(a, b) {
   return parseIsoMs(a) - parseIsoMs(b)
 }
 
+/** API Laravel: x,y,w,h,z — integer и границы; с пикселей часто приходят float → 422. */
+function layoutFieldsForApi(sticker) {
+  const x = Math.round(Number(sticker.x))
+  const y = Math.round(Number(sticker.y))
+  const w = Math.max(50, Math.min(4000, Math.round(Number(sticker.w))))
+  const h = Math.max(50, Math.min(4000, Math.round(Number(sticker.h))))
+  const z = Math.max(0, Math.min(2147483647, Math.round(Number(sticker.z ?? 0))))
+  return {
+    x: Math.max(-100000, Math.min(100000, x)),
+    y: Math.max(-100000, Math.min(100000, y)),
+    w,
+    h,
+    z
+  }
+}
+
 function contentPayloadFromLocal(sticker) {
   const o = {
     text: sticker.text ?? '',
@@ -105,11 +152,7 @@ function contentPayloadFromLocal(sticker) {
     tc: sticker.tc
   }
   if (STICKER.SYNC_INCLUDE_LAYOUT) {
-    o.x = sticker.x
-    o.y = sticker.y
-    o.w = sticker.w
-    o.h = sticker.h
-    o.z = sticker.z
+    Object.assign(o, layoutFieldsForApi(sticker))
   }
   return o
 }
@@ -121,20 +164,40 @@ function postPayloadFromLocal(sticker) {
   }
 }
 
-function applyServerContentToLocal(local, remote) {
+function applyServerContentToLocal(local, remote, options = {}) {
+  const skipLayout = Boolean(options.skipLayout)
   local.text = remote.text ?? ''
   local.folded = !!remote.folded
   local.bc = remote.bc
   local.font = remote.font
   local.fs = remote.fs
   local.tc = remote.tc
-  if (STICKER.SYNC_INCLUDE_LAYOUT) {
+  if (STICKER.SYNC_INCLUDE_LAYOUT && !skipLayout) {
     local.x = remote.x
     local.y = remote.y
     local.w = remote.w
     local.h = remote.h
     local.z = remote.z
   }
+}
+
+/**
+ * После успешного PATCH, который мы сами отправили: не подставлять x,y,w,z с сервера —
+ * иначе округление/эхо API даёт 1px рывок после drag. Геометрия уже в стикере; сервер совпадает с payload.
+ */
+function applyServerContentFromOwnPatchResponse(local, remote) {
+  applyServerContentToLocal(local, remote, { skipLayout: STICKER.SYNC_INCLUDE_LAYOUT })
+}
+
+/** Привести локальную геометрию к тем же int/clamp, что уходят в API (убирает субпиксель и 422). */
+export function snapStickerLayoutInPlace(sticker) {
+  if (!STICKER.SYNC_INCLUDE_LAYOUT || !sticker) return
+  const L = layoutFieldsForApi(sticker)
+  sticker.x = L.x
+  sticker.y = L.y
+  sticker.w = L.w
+  sticker.h = L.h
+  sticker.z = L.z
 }
 
 function applyServerMeta(local, remote) {
@@ -167,6 +230,8 @@ export function clearStickerRemotePatchTimers() {
     clearTimeout(t)
   }
   patchTimers.clear()
+  pendingLayoutSyncTokens.clear()
+  useSyncStore().setBoardLayoutGestureToken(null)
 }
 
 function isRemoteSyncAllowed() {
@@ -175,9 +240,11 @@ function isRemoteSyncAllowed() {
   return auth.isAuthenticated && sync.networkOnline
 }
 
-export function scheduleStickerRemotePatch(token) {
+export function scheduleStickerRemotePatch(token, { layoutChange = false } = {}) {
   const auth = useAuthStore()
   if (!auth.isAuthenticated || !token) return
+
+  if (layoutChange) markLayoutSyncPending(token)
 
   const existing = patchTimers.get(token)
   if (existing) clearTimeout(existing)
@@ -189,6 +256,21 @@ export function scheduleStickerRemotePatch(token) {
       void flushStickerPatch(token)
     }, STICKER.REMOTE_PATCH_DEBOUNCE_MS)
   )
+}
+
+/** Сразу отправить PATCH (без debounce). Для drag/resize после pointerup. */
+export function flushStickerRemotePatchNow(token) {
+  if (!token) return
+  const auth = useAuthStore()
+  if (!auth.isAuthenticated) return
+
+  markLayoutSyncPending(token)
+  const existing = patchTimers.get(token)
+  if (existing) {
+    clearTimeout(existing)
+    patchTimers.delete(token)
+  }
+  void flushStickerPatch(token)
 }
 
 async function flushStickerPatch(token) {
@@ -207,7 +289,8 @@ async function flushStickerPatch(token) {
   const { res, sticker: remote } = await apiStickerPatch(token, contentPayloadFromLocal(sticker))
   if (res.ok && remote?.updated_at) {
     sticker.updated_at = remote.updated_at
-    applyServerContentToLocal(sticker, remote)
+    applyServerContentFromOwnPatchResponse(sticker, remote)
+    clearLayoutSyncPending(token)
     bumpWatermarkFromServerRows(auth, [remote])
   } else if (!res.ok && res.status >= 500) {
     enqueueOutboxUpdate(auth, token, contentPayloadFromLocal(sticker))
@@ -301,7 +384,8 @@ async function processStickersOutbox() {
         const loc = store.stickers.find((s) => s.token === op.token)
         if (loc && sticker?.updated_at) {
           loc.updated_at = sticker.updated_at
-          applyServerContentToLocal(loc, sticker)
+          applyServerContentFromOwnPatchResponse(loc, sticker)
+          clearLayoutSyncPending(op.token)
         }
         bumpWatermarkFromServerRows(auth, sticker ? [sticker] : [])
       } else if (res.status === 404) {
@@ -331,6 +415,10 @@ async function runIncrementalPullImpl() {
   const sync = useSyncStore()
   if (!auth.isAuthenticated || !sync.networkOnline) return
 
+  if (isAnyBoardLayoutGestureActive()) {
+    return
+  }
+
   const since = readWatermark(auth)
   if (!since) return
 
@@ -338,6 +426,10 @@ async function runIncrementalPullImpl() {
   const { res: rRem, data: dRem } = await apiStickersRemovedSince(since)
 
   if (!res.ok && !rRem.ok) return
+
+  if (isAnyBoardLayoutGestureActive()) {
+    return
+  }
 
   const store = await getMainStore()
   const rows = res.ok && data?.stickers ? data.stickers : []
@@ -353,14 +445,19 @@ async function runIncrementalPullImpl() {
       maxId += 1
       store.stickers.push(serverStickerToLocal(remote, maxId))
     } else {
+      if (isBoardLayoutGestureActiveForToken(local.token)) {
+        continue
+      }
       const cmp = compareUpdatedAt(local.updated_at, remote.updated_at)
       if (cmp < 0) {
-        applyServerContentToLocal(local, remote)
+        applyServerContentToLocal(local, remote, { skipLayout: shouldSkipLayoutFromServer(local) })
         applyServerMeta(local, remote)
       } else if (cmp > 0) {
         const { res: pr, sticker: updated } = await apiStickerPatch(local.token, contentPayloadFromLocal(local))
         if (pr.ok && updated?.updated_at) {
           local.updated_at = updated.updated_at
+          applyServerContentFromOwnPatchResponse(local, updated)
+          clearLayoutSyncPending(local.token)
         }
       }
     }
@@ -368,7 +465,9 @@ async function runIncrementalPullImpl() {
 
   if (removedRows.length) {
     const gone = new Set(removedRows.map((r) => r.uuid))
-    store.stickers = store.stickers.filter((s) => !gone.has(s.token))
+    store.stickers = store.stickers.filter(
+      (s) => !gone.has(s.token) || isBoardLayoutGestureActiveForToken(s.token)
+    )
   }
 
   store.nextId = Math.max(store.nextId, maxId + 1)
@@ -404,7 +503,11 @@ async function runAuthenticatedBoardSyncImpl() {
   const localList = [...store.stickers]
 
   const serverList = data.stickers
-  const watermarkRows = [...serverList]
+  const gestureT = sync.boardLayoutGestureToken
+  const watermarkRows =
+    gestureT != null && gestureT !== ''
+      ? serverList.filter((s) => s.uuid !== gestureT)
+      : [...serverList]
   const serverByUuid = new Map(serverList.map((s) => [s.uuid, s]))
 
   const sinceForRemoved = readWatermark(auth) || REMOVED_SINCE_EPOCH
@@ -417,6 +520,10 @@ async function runAuthenticatedBoardSyncImpl() {
   const patchQueue = []
 
   for (const local of localList) {
+    if (local.token && isBoardLayoutGestureActiveForToken(local.token)) {
+      merged.push(local)
+      continue
+    }
     if (local.token && removedUuids.has(local.token)) {
       continue
     }
@@ -429,7 +536,7 @@ async function runAuthenticatedBoardSyncImpl() {
 
     const cmp = compareUpdatedAt(local.updated_at, remote.updated_at)
     if (cmp < 0) {
-      applyServerContentToLocal(local, remote)
+      applyServerContentToLocal(local, remote, { skipLayout: shouldSkipLayoutFromServer(local) })
       applyServerMeta(local, remote)
       merged.push(local)
     } else if (cmp > 0) {
@@ -454,6 +561,12 @@ async function runAuthenticatedBoardSyncImpl() {
   for (const s of store.stickers) {
     if (mergedTokens.has(s.token)) continue
     if (s.token && removedUuids.has(s.token)) continue
+    if (s.token && isBoardLayoutGestureActiveForToken(s.token)) {
+      merged.push(s)
+      mergedTokens.add(s.token)
+      maxId = Math.max(maxId, s.id || 0)
+      continue
+    }
     merged.push(s)
     postQueue.push(s)
     mergedTokens.add(s.token)
@@ -470,7 +583,8 @@ async function runAuthenticatedBoardSyncImpl() {
     (local) =>
       onServer.has(local.token) ||
       postQueueTokenSet.has(local.token) ||
-      pendingCreateTokens.has(local.token)
+      pendingCreateTokens.has(local.token) ||
+      isBoardLayoutGestureActiveForToken(local.token)
   )
 
   store.stickers = pruned
@@ -486,9 +600,14 @@ async function runAuthenticatedBoardSyncImpl() {
   }
 
   for (const local of patchQueue) {
+    if (isBoardLayoutGestureActiveForToken(local.token)) {
+      continue
+    }
     const { res: r, sticker: updated } = await apiStickerPatch(local.token, contentPayloadFromLocal(local))
     if (r.ok && updated?.updated_at) {
       local.updated_at = updated.updated_at
+      applyServerContentFromOwnPatchResponse(local, updated)
+      clearLayoutSyncPending(local.token)
       if (updated) watermarkRows.push(updated)
     }
   }

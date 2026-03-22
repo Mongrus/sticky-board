@@ -1,12 +1,48 @@
 <script setup>
 import { useMainStore } from '@/stores/main.store';
+import { useSyncStore } from '@/stores/sync.store';
 import { STICKER, STICKER_COLORS, STICKER_FONTS } from '@/constants/sticker.constants';
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue';
 
 const store = useMainStore();
+const syncStore = useSyncStore();
 const settingsSticker = ref(false);
 const stickerRef = ref(null);
 const popoverPosition = ref({ top: 0, right: 0 });
+
+/** Во время resize — живые x,y,w,h; иначе Vue :style с стором затирает el.style и даёт прыжки при pull. */
+const resizePreview = ref(null)
+
+const dragActive = ref(false)
+const dragDelta = ref({ dx: 0, dy: 0 })
+
+const stickerCardStyle = computed(() => {
+  const zModel = sticker.z
+  const zLift = STICKER.DRAG_GESTURE_Z_INDEX
+  if (resizePreview.value) {
+    const r = resizePreview.value
+    return {
+      left: `${r.x}px`,
+      top: `${r.y}px`,
+      width: `${r.w}px`,
+      height: `${r.h}px`,
+      zIndex: zLift,
+      transform: 'translateZ(0)'
+    }
+  }
+  const transform =
+    dragActive.value && (dragDelta.value.dx !== 0 || dragDelta.value.dy !== 0)
+      ? `translate(${dragDelta.value.dx}px, ${dragDelta.value.dy}px) translateZ(0)`
+      : 'translateZ(0)'
+  return {
+    left: `${sticker.x}px`,
+    top: `${sticker.y}px`,
+    width: `${sticker.w}px`,
+    height: `${sticker.h}px`,
+    zIndex: dragActive.value ? zLift : zModel,
+    transform
+  }
+})
 
 const {sticker} = defineProps({
     sticker: Object
@@ -84,12 +120,15 @@ function moveSticker(e, id) {
 
     if (resizing) return
 
-    store.bringToFront(id)
+    syncStore.setBoardLayoutGestureToken(sticker.token)
 
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
 
     document.body.style.cursor = 'grabbing'
+
+    dragActive.value = true
+    dragDelta.value = { dx: 0, dy: 0 }
 
     const startX = e.clientX
     const startY = e.clientY
@@ -103,7 +142,7 @@ function moveSticker(e, id) {
         dy = ev.clientY - startY
         if (rafId === null) {
             rafId = requestAnimationFrame(() => {
-                el.style.transform = `translate(${dx}px, ${dy}px) translateZ(0)`
+                dragDelta.value = { dx, dy }
                 rafId = null
             })
         }
@@ -121,13 +160,25 @@ function moveSticker(e, id) {
             rafId = null
         }
 
-        store.setPositionSticker(
-            id,
-            sticker.x + dx,
-            sticker.y + dy
-        )
+        // Последний кадр мог не попасть в rAF — выравниваем ref с замыканием до коммита в стор
+        dragDelta.value = { dx, dy }
 
-        el.style.transform = 'translateZ(0)'
+        const nextX = sticker.x + dx
+        const nextY = sticker.y + dy
+
+        // Один кадр с translate + старыми x/y, затем коммит в стор — без рассинхрона с paint; z и позиция — один PATCH
+        requestAnimationFrame(() => {
+            try {
+                store.bringToFront(id)
+                store.setPositionSticker(id, nextX, nextY)
+            } finally {
+                syncStore.setBoardLayoutGestureToken(null)
+            }
+            dragDelta.value = { dx: 0, dy: 0 }
+            void nextTick(() => {
+                dragActive.value = false
+            })
+        })
 
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', stop)
@@ -142,7 +193,7 @@ function moveSticker(e, id) {
 function resizeSticker(e, id, corner) {
 
     resizing = true
-    store.bringToFront(id)
+    syncStore.setBoardLayoutGestureToken(sticker.token)
 
     const el = e.currentTarget.parentElement
     el.setPointerCapture(e.pointerId)
@@ -212,11 +263,7 @@ function resizeSticker(e, id, corner) {
         finalX = x
         finalY = y
 
-        el.style.transform =
-        `translate(${x - startLeft}px, ${y - startTop}px) translateZ(0)`
-
-        el.style.width = w + 'px'
-        el.style.height = h + 'px'
+        resizePreview.value = { x, y, w, h }
     }
 
     const stop = (ev) => {
@@ -227,9 +274,20 @@ function resizeSticker(e, id, corner) {
             el.releasePointerCapture(ev.pointerId)
         }
 
-        el.style.transform = 'translateZ(0)'
+        // Явно зафиксировать финальный прямоугольник (на случай pointerup без последнего resize)
+        resizePreview.value = { x: finalX, y: finalY, w: finalW, h: finalH }
 
-        store.setSizeSticker(id, finalW, finalH, finalX, finalY)
+        requestAnimationFrame(() => {
+            try {
+                store.bringToFront(id)
+                store.setSizeSticker(id, finalW, finalH, finalX, finalY)
+            } finally {
+                syncStore.setBoardLayoutGestureToken(null)
+            }
+            void nextTick(() => {
+                resizePreview.value = null
+            })
+        })
 
         window.removeEventListener('pointermove', resize)
         window.removeEventListener('pointerup', stop)
@@ -274,13 +332,7 @@ function changingStickerSettings() {
     <div
         ref="stickerRef"
         class="sticker"
-        :style="{
-            left: sticker.x + 'px',
-            top: sticker.y + 'px',
-            zIndex: sticker.z,
-            width: sticker.w + 'px',
-            height: sticker.h + 'px'
-        }"
+        :style="stickerCardStyle"
         @pointerdown="moveSticker($event, sticker.id)"
     >
         <textarea

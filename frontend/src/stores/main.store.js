@@ -9,8 +9,10 @@ import { useAuthStore } from '@/stores/auth.store'
 import { clearOutbox } from '@/services/stickersOutbox'
 import {
   scheduleStickerRemotePatch,
+  flushStickerRemotePatchNow,
   pushNewStickerToServer,
-  deleteStickerOnServer
+  deleteStickerOnServer,
+  snapStickerLayoutInPlace
 } from '@/services/stickersRemoteSync';
 
 const DEFAULT_SETTINGS = {
@@ -77,12 +79,19 @@ export const useMainStore = defineStore('stickers', () => {
         scheduleStickerRemotePatch(sticker.token)
     }
 
-    function bumpLayoutTimestampIfSynced(id) {
+    /**
+     * @param {boolean} [immediate] — true после pointerup drag/resize: PATCH сразу, без debounce (меньше гонок с pull).
+     */
+    function bumpLayoutTimestampIfSynced(id, immediate = false) {
         if (!STICKER.SYNC_INCLUDE_LAYOUT) return
         const sticker = stickers.value.find((s) => s.id === id)
         if (!sticker) return
         sticker.updated_at = stickerNowIso()
-        scheduleStickerRemotePatch(sticker.token)
+        if (immediate) {
+            flushStickerRemotePatchNow(sticker.token)
+        } else {
+            scheduleStickerRemotePatch(sticker.token, { layoutChange: true })
+        }
     }
 
     function setPositionSticker(id, x, y) {
@@ -90,7 +99,8 @@ export const useMainStore = defineStore('stickers', () => {
 
         sticker.x = x
         sticker.y = y
-        bumpLayoutTimestampIfSynced(id)
+        snapStickerLayoutInPlace(sticker)
+        bumpLayoutTimestampIfSynced(id, true)
     }
 
     function setSizeSticker(id, w, h, x, y) {
@@ -101,7 +111,8 @@ export const useMainStore = defineStore('stickers', () => {
     sticker.h = h
     sticker.x = x
     sticker.y = y
-    bumpLayoutTimestampIfSynced(id)
+    snapStickerLayoutInPlace(sticker)
+    bumpLayoutTimestampIfSynced(id, true)
     }
 
     function setFoldedSticker(id) {
@@ -118,6 +129,7 @@ export const useMainStore = defineStore('stickers', () => {
     const maxZ = Math.max(...stickers.value.map(s => s.z), 0)
 
     sticker.z = maxZ + 1
+    snapStickerLayoutInPlace(sticker)
     bumpLayoutTimestampIfSynced(id)
     }
 

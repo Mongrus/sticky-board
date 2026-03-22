@@ -4,8 +4,10 @@ export const STICKER = {
   TEXT_SAVE_DEBOUNCE_MS: 350,
   REMOTE_PATCH_DEBOUNCE_MS: 400,
   /** Инкрементальный pull с сервера (видимая вкладка, залогинен, онлайн). */
-  REMOTE_PULL_INTERVAL_MS: 10_000,
-  SYNC_INCLUDE_LAYOUT: false
+  REMOTE_PULL_INTERVAL_MS: 3_000,
+  SYNC_INCLUDE_LAYOUT: true,
+  /** Поверх остальных стикеров во время drag/resize (z в сторе — только после pointerup). */
+  DRAG_GESTURE_Z_INDEX: 2_147_483_000
 }
 
 export const STICKER_COLORS = [
