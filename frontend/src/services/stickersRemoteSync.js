@@ -58,6 +58,12 @@ function isBoardTextEditActiveForToken(token) {
   return sync.boardTextEditToken === token
 }
 
+function isBoardStickerSettingsActiveForToken(token) {
+  if (!token) return false
+  const sync = useSyncStore()
+  return sync.boardStickerSettingsToken === token
+}
+
 async function getMainStore() {
   const { useMainStore } = await import('@/stores/main.store')
   return useMainStore()
@@ -100,6 +106,8 @@ async function tryApplyRemoteBoardEpochWipe(authStore, boardEpoch, stickerRowsIn
 
   const sync = useSyncStore()
   const textBusy = sync.boardTextEditToken != null && sync.boardTextEditToken !== ''
+  const settingsBusy =
+    sync.boardStickerSettingsToken != null && sync.boardStickerSettingsToken !== ''
 
   const store = await getMainStore()
   if (store.stickers.length === 0) {
@@ -108,7 +116,7 @@ async function tryApplyRemoteBoardEpochWipe(authStore, boardEpoch, stickerRowsIn
   }
 
   if (loadOutboxOps(authStore).length > 0) return false
-  if (isAnyBoardLayoutGestureActive() || textBusy) return false
+  if (isAnyBoardLayoutGestureActive() || textBusy || settingsBusy) return false
 
   store.stickers = []
   store.nextId = 1
@@ -246,6 +254,9 @@ function applyServerContentToLocal(local, remote, options = {}) {
  */
 function applyServerContentFromOwnPatchResponse(local, remote) {
   if (isBoardTextEditActiveForToken(local.token)) {
+    return
+  }
+  if (isBoardStickerSettingsActiveForToken(local.token)) {
     return
   }
   applyServerContentToLocal(local, remote, { skipLayout: STICKER.SYNC_INCLUDE_LAYOUT })
@@ -542,6 +553,9 @@ async function runIncrementalPullImpl() {
       if (isBoardTextEditActiveForToken(local.token)) {
         continue
       }
+      if (isBoardStickerSettingsActiveForToken(local.token)) {
+        continue
+      }
       const cmp = compareUpdatedAt(local.updated_at, remote.updated_at)
       if (cmp < 0) {
         applyServerContentToLocal(local, remote, { skipLayout: shouldSkipLayoutFromServer(local) })
@@ -563,7 +577,8 @@ async function runIncrementalPullImpl() {
       (s) =>
         !gone.has(s.token) ||
         isBoardLayoutGestureActiveForToken(s.token) ||
-        isBoardTextEditActiveForToken(s.token)
+        isBoardTextEditActiveForToken(s.token) ||
+        isBoardStickerSettingsActiveForToken(s.token)
     )
   }
 
@@ -633,6 +648,10 @@ async function runAuthenticatedBoardSyncImpl() {
       merged.push(local)
       continue
     }
+    if (local.token && isBoardStickerSettingsActiveForToken(local.token)) {
+      merged.push(local)
+      continue
+    }
     if (local.token && removedUuids.has(local.token)) {
       continue
     }
@@ -682,6 +701,12 @@ async function runAuthenticatedBoardSyncImpl() {
       maxId = Math.max(maxId, s.id || 0)
       continue
     }
+    if (s.token && isBoardStickerSettingsActiveForToken(s.token)) {
+      merged.push(s)
+      mergedTokens.add(s.token)
+      maxId = Math.max(maxId, s.id || 0)
+      continue
+    }
     merged.push(s)
     postQueue.push(s)
     mergedTokens.add(s.token)
@@ -700,7 +725,8 @@ async function runAuthenticatedBoardSyncImpl() {
       postQueueTokenSet.has(local.token) ||
       pendingCreateTokens.has(local.token) ||
       isBoardLayoutGestureActiveForToken(local.token) ||
-      isBoardTextEditActiveForToken(local.token)
+      isBoardTextEditActiveForToken(local.token) ||
+      isBoardStickerSettingsActiveForToken(local.token)
   )
 
   store.stickers = pruned
@@ -720,6 +746,9 @@ async function runAuthenticatedBoardSyncImpl() {
       continue
     }
     if (isBoardTextEditActiveForToken(local.token)) {
+      continue
+    }
+    if (isBoardStickerSettingsActiveForToken(local.token)) {
       continue
     }
     const { res: r, sticker: updated } = await apiStickerPatch(local.token, contentPayloadFromLocal(local))

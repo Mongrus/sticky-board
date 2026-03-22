@@ -19,6 +19,13 @@ export const useSyncStore = defineStore('sync', () => {
     boardTextEditToken.value = token
   }
 
+  /** Пока открыт поповер настроек стикера (цвет/шрифт/размер) — pull не затирает контент с сервера. */
+  const boardStickerSettingsToken = ref(null)
+
+  function setBoardStickerSettingsToken(token) {
+    boardStickerSettingsToken.value = token
+  }
+
   function setNetworkOnline(value) {
     networkOnline.value = value
     if (!value) {
@@ -47,6 +54,8 @@ export const useSyncStore = defineStore('sync', () => {
     setBoardLayoutGestureToken,
     boardTextEditToken,
     setBoardTextEditToken,
+    boardStickerSettingsToken,
+    setBoardStickerSettingsToken,
     setNetworkOnline,
     setSyncing,
     setSynced,

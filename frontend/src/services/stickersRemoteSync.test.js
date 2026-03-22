@@ -17,6 +17,10 @@ const mockSync = vi.hoisted(() => {
     setBoardTextEditToken: vi.fn((token) => {
       o.boardTextEditToken = token
     }),
+    boardStickerSettingsToken: null,
+    setBoardStickerSettingsToken: vi.fn((token) => {
+      o.boardStickerSettingsToken = token
+    }),
     setError: vi.fn(() => {
       o.syncStatus = 'error'
     }),
@@ -100,6 +104,7 @@ beforeEach(async () => {
   mockSync.syncStatus = 'synced'
   mockSync.setBoardLayoutGestureToken(null)
   mockSync.setBoardTextEditToken(null)
+  mockSync.setBoardStickerSettingsToken(null)
   mockMain.stickers.splice(0, mockMain.stickers.length)
   mockMain.nextId = 10
 
@@ -554,6 +559,48 @@ describe('stickersRemoteSync', () => {
     await pullStickersSinceWatermark()
 
     expect(mockMain.stickers.find((s) => s.token === token).text).toBe('user typing')
+    expect(stickersApiMocks.apiStickerPatch).not.toHaveBeenCalled()
+  })
+
+  it('pullStickersSinceWatermark: no content merge while board sticker settings token set', async () => {
+    localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
+    const token = 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee'
+    mockMain.stickers.push(
+      baseSticker({
+        token,
+        bc: '#FFF9C4',
+        font: 'Inter, sans-serif',
+        updated_at: '2025-01-01T00:00:00.000Z'
+      })
+    )
+    mockSync.setBoardStickerSettingsToken(token)
+
+    stickersApiMocks.apiStickersList.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: {
+        board_epoch: 0,
+        stickers: [
+          {
+            uuid: token,
+            updated_at: '2025-12-01T00:00:00.000Z',
+            text: 'srv',
+            folded: false,
+            bc: '#E8F5E9',
+            font: 'Roboto, sans-serif',
+            fs: 24,
+            tc: '#111'
+          }
+        ]
+      }
+    })
+
+    stickersApiMocks.apiStickerPatch.mockClear()
+
+    await pullStickersSinceWatermark()
+
+    const s = mockMain.stickers.find((x) => x.token === token)
+    expect(s.bc).toBe('#FFF9C4')
+    expect(s.font).toBe('Inter, sans-serif')
     expect(stickersApiMocks.apiStickerPatch).not.toHaveBeenCalled()
   })
 

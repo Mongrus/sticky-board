@@ -22,7 +22,10 @@ function onDocumentPointerDown(e) {
 
 watch(
     () => props.active,
-    (isActive) => {
+    (isActive, wasActive) => {
+        if (wasActive && !isActive) {
+            commitFontSize();
+        }
         if (isActive) {
             requestAnimationFrame(() => {
                 document.addEventListener('pointerdown', onDocumentPointerDown);
@@ -37,13 +40,13 @@ onUnmounted(() => {
     document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
 
-const localFontSize = ref(clampStickerFontSize(store.settings.fontSize));
+const fontSizeDraft = ref(String(clampStickerFontSize(store.settings.fontSize)));
 const localHeight = ref(store.settings.height);
 const localWidth = ref(store.settings.width);
 const localBackgroundColor = ref(store.settings.backgroundColor);
 
 watch(() => store.settings.fontSize, (newVal) => {
-    localFontSize.value = clampStickerFontSize(newVal);
+    fontSizeDraft.value = String(clampStickerFontSize(newVal));
 });
 
 watch(() => store.settings.height, (newVal) => {
@@ -58,10 +61,12 @@ watch(() => store.settings.backgroundColor, (newVal) => {
     localBackgroundColor.value = newVal;
 });
 
-function updateFontSize() {
-    const c = clampStickerFontSize(localFontSize.value)
-    localFontSize.value = c
-    store.settings.fontSize = c
+function commitFontSize() {
+    const c = clampStickerFontSize(fontSizeDraft.value);
+    fontSizeDraft.value = String(c);
+    if (store.settings.fontSize !== c) {
+        store.settings.fontSize = c;
+    }
 }
 
 function updateHeight() {
@@ -94,13 +99,14 @@ function resetToDefaults() {
                 </select>
             </div>
             <div class="setting-item">
-                <label>🔤 Размер шрифта:</label>
+                <label>🔤 Размер шрифта ({{ STICKER.FONT_SIZE_MIN }}–{{ STICKER.FONT_SIZE_MAX }}):</label>
                 <input
                     type="number"
-                    v-model.number="localFontSize"
-                    :min="STICKER.FONT_SIZE_MIN"
-                    :max="STICKER.FONT_SIZE_MAX"
-                    @blur="updateFontSize"
+                    v-model="fontSizeDraft"
+                    step="1"
+                    inputmode="numeric"
+                    @blur="commitFontSize"
+                    @keydown.enter.prevent="$event.currentTarget.blur()"
                 >
             </div>
             <div class="setting-item">

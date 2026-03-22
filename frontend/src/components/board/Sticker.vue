@@ -50,7 +50,8 @@ const {sticker} = defineProps({
 
 const localText = ref(sticker.text);
 const localFont = ref(sticker.font);
-const localFontSize = ref(clampStickerFontSize(sticker.fs));
+/** Строка в инпуте: кламп только при blur / Enter / закрытии поповера — иначе нельзя стереть и набрать 20. */
+const fontSizeDraft = ref(String(clampStickerFontSize(sticker.fs)));
 
 watch(() => sticker.text, (newVal) => {
     localText.value = newVal;
@@ -61,7 +62,7 @@ watch(() => sticker.font, (newVal) => {
 });
 
 watch(() => sticker.fs, (newVal) => {
-    localFontSize.value = clampStickerFontSize(newVal);
+    fontSizeDraft.value = String(clampStickerFontSize(newVal));
 });
 
 function updateText() {
@@ -99,11 +100,13 @@ function updateFont() {
     store.bumpStickerUpdatedAt(sticker.id);
 }
 
-function updateFontSize() {
-    const c = clampStickerFontSize(localFontSize.value)
-    localFontSize.value = c
-    sticker.fs = c
-    store.bumpStickerUpdatedAt(sticker.id);
+function commitStickerFontSize() {
+    const c = clampStickerFontSize(fontSizeDraft.value);
+    fontSizeDraft.value = String(c);
+    if (sticker.fs !== c) {
+        sticker.fs = c;
+        store.bumpStickerUpdatedAt(sticker.id);
+    }
 }
 
 function setStickerBackground(bc) {
@@ -125,6 +128,9 @@ onUnmounted(() => {
     clearTimeout(textSaveTimer);
     if (syncStore.boardTextEditToken === sticker.token) {
         syncStore.setBoardTextEditToken(null);
+    }
+    if (syncStore.boardStickerSettingsToken === sticker.token) {
+        syncStore.setBoardStickerSettingsToken(null);
     }
 });
 
@@ -332,6 +338,16 @@ const POPOVER_WIDTH = 340;
 const POPOVER_HEIGHT = 280;
 const MARGIN = 8;
 
+watch(settingsSticker, (open, prevOpen) => {
+    if (open && !prevOpen) {
+        syncStore.setBoardStickerSettingsToken(sticker.token);
+    }
+    if (prevOpen && !open) {
+        commitStickerFontSize();
+        syncStore.setBoardStickerSettingsToken(null);
+    }
+});
+
 function changingStickerSettings() {
     if (!settingsSticker.value && stickerRef.value) {
         const rect = stickerRef.value.getBoundingClientRect();
@@ -417,13 +433,14 @@ function changingStickerSettings() {
                     <select v-model="localFont" @change="updateFont">
                         <option v-for="font in STICKER_FONTS" :value="font.value">{{ font.label }}</option>
                     </select>
-                    <label>Размер шрифта:</label>
+                    <label>Размер шрифта ({{ STICKER.FONT_SIZE_MIN }}–{{ STICKER.FONT_SIZE_MAX }}):</label>
                     <input
                         type="number"
-                        v-model.number="localFontSize"
-                        :min="STICKER.FONT_SIZE_MIN"
-                        :max="STICKER.FONT_SIZE_MAX"
-                        @input="updateFontSize"
+                        v-model="fontSizeDraft"
+                        step="1"
+                        inputmode="numeric"
+                        @blur="commitStickerFontSize"
+                        @keydown.enter.prevent="$event.currentTarget.blur()"
                     >
                 </div>
             </div>
