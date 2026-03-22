@@ -514,6 +514,7 @@ function changingStickerSettings() {
     resize: none
     border: none
     box-sizing: border-box
+    white-space: pre-wrap
     &:active
         cursor: grabbing
     &::-webkit-scrollbar

@@ -115,6 +115,21 @@ class StickerTest extends TestCase
         $this->assertSame('new', $sticker->fresh()->text);
     }
 
+    public function test_patch_sticker_preserves_leading_spaces_in_text(): void
+    {
+        $user = User::factory()->create();
+        $sticker = Sticker::factory()->for($user)->create(['text' => 'x']);
+
+        $withIndent = '    padded line';
+
+        $this->actingAs($user)
+            ->patchJson('/api/stickers/'.$sticker->uuid, ['text' => $withIndent])
+            ->assertOk()
+            ->assertJsonPath('sticker.text', $withIndent);
+
+        $this->assertSame($withIndent, $sticker->fresh()->text);
+    }
+
     public function test_user_can_patch_sticker_fs_in_allowed_range(): void
     {
         $user = User::factory()->create();

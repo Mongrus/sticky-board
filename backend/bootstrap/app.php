@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
 
+        // Глобальный TrimStrings иначе срезает ведущие/хвостовые пробелы у JSON `text` стикера.
+        $middleware->trimStrings(except: [
+            'text',
+        ]);
+
         $middleware->redirectGuestsTo(function (Request $request) {
             if ($request->is('api/*')) {
                 return null;
