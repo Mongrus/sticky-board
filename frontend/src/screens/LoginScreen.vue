@@ -92,7 +92,9 @@ function continueAsGuest() {
 
 <style scoped lang="sass">
 .auth-screen
-  min-height: 100%
+  flex: 1
+  min-height: 0
+  width: 100%
   display: flex
   align-items: center
   justify-content: center

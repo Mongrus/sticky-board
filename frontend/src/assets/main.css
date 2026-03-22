@@ -1,3 +1,31 @@
-html, body, #app {
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+#app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Доска на мобилке: прокрутка только во вьюпорте доски, не у всей страницы */
+html.board-screen,
+body.board-screen {
+  overflow: hidden;
   height: 100%;
+  overscroll-behavior: none;
+}
+
+html.board-screen #app {
+  overflow: hidden;
+  min-height: 100dvh;
+  max-height: 100dvh;
 }

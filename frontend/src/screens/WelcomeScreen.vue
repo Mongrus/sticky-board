@@ -46,7 +46,9 @@ function startWork() {
     display: flex
     align-items: center
     justify-content: center
-    height: 100%
+    flex: 1
+    min-height: 0
+    width: 100%
 
     background: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)
     background-size: 20px 20px

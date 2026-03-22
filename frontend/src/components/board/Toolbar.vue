@@ -5,6 +5,7 @@ import { useSyncStore } from '@/stores/sync.store'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { performLogout } from '@/services/authSession'
+import { BOARD_MOBILE_LAYOUT_MAX_WIDTH_PX } from '@/constants/board.constants'
 
 defineProps({
     activeGeneralSettings: Boolean
@@ -15,6 +16,23 @@ const emit = defineEmits(['toggleSettings'])
 const store = useMainStore()
 const authStore = useAuthStore()
 const syncStore = useSyncStore()
+
+function toolbarCompactMql() {
+    return typeof window !== 'undefined'
+        ? window.matchMedia(`(max-width: ${BOARD_MOBILE_LAYOUT_MAX_WIDTH_PX}px)`)
+        : null
+}
+
+const compactSyncUi = ref(
+    typeof window !== 'undefined' ? toolbarCompactMql()?.matches === true : false
+)
+
+function syncCompactUiFlag() {
+    const mql = toolbarCompactMql()
+    compactSyncUi.value = mql ? mql.matches : false
+}
+
+let compactMqlListener = null
 
 const syncLabel = computed(() => {
     switch (syncStore.syncStatus) {
@@ -29,6 +47,23 @@ const syncLabel = computed(() => {
     }
 })
 
+/** На узком экране — только «лампочка»: зелёная ок, красная ошибка, серая офлайн/гость/синк. */
+const syncLampClass = computed(() => {
+    if (authStore.isGuest) {
+        return 'toolbar__sync-lamp--gray'
+    }
+    switch (syncStore.syncStatus) {
+        case 'error':
+            return 'toolbar__sync-lamp--red'
+        case 'offline':
+            return 'toolbar__sync-lamp--gray'
+        case 'syncing':
+            return 'toolbar__sync-lamp--gray toolbar__sync-lamp--pulse'
+        default:
+            return 'toolbar__sync-lamp--green'
+    }
+})
+
 const shortEmail = computed(() => {
     const e = authStore.user?.email || ''
     if (e.length <= 22) return e
@@ -39,50 +74,111 @@ async function onLogout() {
     await performLogout()
 }
 
-const toolbarPosition = ref({ x: window.innerWidth - 200, y: 10 });
-const toolbarRef = ref(null);
+const STORAGE_TOOLBAR_WIDE = 'toolbar-position-wide'
+const STORAGE_TOOLBAR_COMPACT = 'toolbar-position-compact'
+const STORAGE_TOOLBAR_LEGACY = 'toolbar-position'
+
+const EDGE_MARGIN = 4
+
+const toolbarRef = ref(null)
 
 function getToolbarWidth() {
-    return toolbarRef.value?.offsetWidth ?? 180;
+    return toolbarRef.value?.offsetWidth ?? 180
 }
 
-const EDGE_MARGIN = 4;
-
 function clampPosition(pos) {
-    const width = getToolbarWidth();
-    const maxX = Math.max(0, window.innerWidth - width - EDGE_MARGIN);
+    const width = getToolbarWidth()
+    const maxX = Math.max(0, window.innerWidth - width - EDGE_MARGIN)
     return {
         x: Math.max(EDGE_MARGIN, Math.min(maxX, pos.x)),
         y: pos.y
-    };
+    }
+}
+
+function defaultCenteredToolbarX() {
+    if (typeof window === 'undefined') return EDGE_MARGIN
+    const guessW = 280
+    return Math.max(EDGE_MARGIN, (window.innerWidth - guessW) / 2)
+}
+
+function initialToolbarPosition() {
+    if (typeof window === 'undefined') return { x: 0, y: 10 }
+    if (toolbarCompactMql()?.matches) {
+        return { x: defaultCenteredToolbarX(), y: 10 }
+    }
+    return { x: Math.max(EDGE_MARGIN, window.innerWidth - 200), y: 10 }
+}
+
+const toolbarPosition = ref(initialToolbarPosition())
+
+function toolbarStorageKey() {
+    return compactSyncUi.value ? STORAGE_TOOLBAR_COMPACT : STORAGE_TOOLBAR_WIDE
+}
+
+function applyToolbarPositionFromStorage() {
+    const key = toolbarStorageKey()
+    let raw = localStorage.getItem(key)
+    if (!raw && !compactSyncUi.value) {
+        raw = localStorage.getItem(STORAGE_TOOLBAR_LEGACY)
+        if (raw && !localStorage.getItem(STORAGE_TOOLBAR_WIDE)) {
+            try {
+                localStorage.setItem(STORAGE_TOOLBAR_WIDE, raw)
+            } catch {
+                /* ignore quota */
+            }
+        }
+    }
+    const run = () => {
+        const width = getToolbarWidth()
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw)
+                if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+                    toolbarPosition.value = clampPosition(parsed)
+                    return
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+        toolbarPosition.value = {
+            x: Math.max(EDGE_MARGIN, (window.innerWidth - width) / 2),
+            y: 10
+        }
+    }
+    requestAnimationFrame(() => requestAnimationFrame(run))
 }
 
 function handleResize() {
-    toolbarPosition.value = clampPosition(toolbarPosition.value);
+    toolbarPosition.value = clampPosition(toolbarPosition.value)
 }
 
 onMounted(() => {
-    const saved = localStorage.getItem('toolbar-position');
-    const applyPosition = () => {
-        if (saved) {
-            toolbarPosition.value = clampPosition(JSON.parse(saved));
-        } else {
-            const width = getToolbarWidth();
-            toolbarPosition.value = { x: Math.max(0, (window.innerWidth - width) / 2), y: 10 };
-        }
-    };
-    requestAnimationFrame(applyPosition);
-    window.addEventListener('resize', handleResize);
-});
+    syncCompactUiFlag()
+    compactMqlListener = toolbarCompactMql()
+    compactMqlListener?.addEventListener('change', syncCompactUiFlag)
+
+    applyToolbarPositionFromStorage()
+    window.addEventListener('resize', handleResize)
+})
 
 onUnmounted(() => {
-    window.removeEventListener('resize', handleResize);
-});
+    compactMqlListener?.removeEventListener('change', syncCompactUiFlag)
+    window.removeEventListener('resize', handleResize)
+})
+
+watch(compactSyncUi, () => {
+    applyToolbarPositionFromStorage()
+})
 
 watch(toolbarPosition, (newPos) => {
-    const clamped = clampPosition(newPos);
-    localStorage.setItem('toolbar-position', JSON.stringify(clamped));
-}, { deep: true });
+    const clamped = clampPosition(newPos)
+    try {
+        localStorage.setItem(toolbarStorageKey(), JSON.stringify(clamped))
+    } catch {
+        /* ignore quota */
+    }
+}, { deep: true })
 
 const DRAG_THRESHOLD = 10;
 
@@ -139,9 +235,18 @@ function startDrag(e) {
 </script>
 
 <template>
-    <div ref="toolbarRef" class="toolbar" @pointerdown="startDrag" :style="{ left: '0px', top: '0px', transform: `translate(${toolbarPosition.x}px, ${toolbarPosition.y}px)` }">
+    <div ref="toolbarRef" class="toolbar" :class="{ 'toolbar--compact': compactSyncUi }" @pointerdown="startDrag" :style="{ left: '0px', top: '0px', transform: `translate(${toolbarPosition.x}px, ${toolbarPosition.y}px)` }">
         <div class="toolbar__account" @pointerdown.stop>
             <span
+                v-if="compactSyncUi"
+                class="toolbar__sync-lamp"
+                :class="syncLampClass"
+                role="status"
+                :aria-label="syncLabel"
+                :title="syncLabel"
+            />
+            <span
+                v-else
                 class="toolbar__sync-badge"
                 :class="{
                     'toolbar__sync-badge--offline': syncStore.syncStatus === 'offline',
@@ -216,6 +321,25 @@ function startDrag(e) {
     padding-right: 4px
     margin-right: 4px
 
+.toolbar__sync-lamp
+    flex-shrink: 0
+    width: 14px
+    height: 14px
+    border-radius: 50%
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12)
+    &--green
+        background: #2e7d32
+    &--red
+        background: #c62828
+    &--gray
+        background: #9e9e9e
+    &--pulse
+        animation: toolbar-sync-lamp-pulse 1s ease-in-out infinite
+
+@keyframes toolbar-sync-lamp-pulse
+    50%
+        opacity: 0.5
+
 .toolbar__sync-badge
     flex-shrink: 0
     font-size: 11px
@@ -274,6 +398,9 @@ function startDrag(e) {
     display: flex
     gap: 4px
     padding: 10px
+    &--compact
+        gap: 3px
+        padding: 8px
     border-radius: 12px
     background-color: #F5F8FC
     box-shadow: 0 4px 14px rgba(0,0,0,0.12)

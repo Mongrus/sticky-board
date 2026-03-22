@@ -17,7 +17,8 @@ import {
   deleteStickerOnServer,
   snapStickerLayoutInPlace,
   bumpWatermarkFromLocalIfStillEmpty
-} from '@/services/stickersRemoteSync';
+} from '@/services/stickersRemoteSync'
+import { clampStickerLayoutToBoardBounds } from '@/utils/boardLayoutClamp'
 
 const DEFAULT_SETTINGS = {
     width: 200,
@@ -73,6 +74,8 @@ export const useMainStore = defineStore('stickers', () => {
             z
         });
         const created = stickers.value[stickers.value.length - 1]
+        snapStickerLayoutInPlace(created)
+        clampStickerLayoutToBoardBounds(created)
         void pushNewStickerToServer(created)
     }
 
@@ -104,6 +107,7 @@ export const useMainStore = defineStore('stickers', () => {
         sticker.x = x
         sticker.y = y
         snapStickerLayoutInPlace(sticker)
+        clampStickerLayoutToBoardBounds(sticker)
         bumpLayoutTimestampIfSynced(id, true)
     }
 
@@ -116,6 +120,7 @@ export const useMainStore = defineStore('stickers', () => {
     sticker.x = x
     sticker.y = y
     snapStickerLayoutInPlace(sticker)
+    clampStickerLayoutToBoardBounds(sticker)
     bumpLayoutTimestampIfSynced(id, true)
     }
 
@@ -134,6 +139,7 @@ export const useMainStore = defineStore('stickers', () => {
 
     sticker.z = maxZ + 1
     snapStickerLayoutInPlace(sticker)
+    clampStickerLayoutToBoardBounds(sticker)
     bumpLayoutTimestampIfSynced(id)
     }
 
@@ -272,6 +278,8 @@ export const useMainStore = defineStore('stickers', () => {
                 s.updated_at = now
             }
             s.fs = clampStickerFontSize(s.fs, DEFAULT_SETTINGS.fontSize)
+            snapStickerLayoutInPlace(s)
+            clampStickerLayoutToBoardBounds(s)
         }
     }
 

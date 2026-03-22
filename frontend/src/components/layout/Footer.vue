@@ -36,9 +36,11 @@ const yearText =
 <style scoped lang="sass">
 
 .footer
+    flex-shrink: 0
     border-top: 1px solid rgba(0,0,0,0.08)
     background: #F5F8FC
     padding: 10px 20px
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px))
     font-size: 14px
     color: #666
     &__inner
