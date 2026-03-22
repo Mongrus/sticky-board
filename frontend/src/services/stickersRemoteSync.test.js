@@ -118,6 +118,7 @@ beforeEach(async () => {
     res: { ok: true, status: 201 },
     sticker: {
       uuid: 'aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee',
+      display_id: 1,
       updated_at: '2025-07-01T00:00:00.000Z',
       text: 'srv',
       folded: false
@@ -125,7 +126,12 @@ beforeEach(async () => {
   })
   stickersApiMocks.apiStickerPatch.mockResolvedValue({
     res: { ok: true, status: 200 },
-    sticker: { updated_at: '2025-07-01T00:00:00.000Z', text: 'patched', folded: false }
+    sticker: {
+      display_id: 1,
+      updated_at: '2025-07-01T00:00:00.000Z',
+      text: 'patched',
+      folded: false
+    }
   })
   stickersApiMocks.apiStickerDelete.mockResolvedValue({ ok: true, status: 204 })
 
@@ -160,6 +166,23 @@ describe('stickersRemoteSync', () => {
     expect(stickersApiMocks.apiStickerCreate).toHaveBeenCalledTimes(1)
     expect(s.updated_at).toBe('2025-07-01T00:00:00.000Z')
     expect(s.text).toBe('srv')
+    expect(s.id).toBe(1)
+  })
+
+  it('pushNewStickerToServer: server display_id becomes local id', async () => {
+    stickersApiMocks.apiStickerCreate.mockResolvedValueOnce({
+      res: { ok: true, status: 201 },
+      sticker: {
+        uuid: 'aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee',
+        display_id: 42,
+        updated_at: '2025-07-01T00:00:00.000Z',
+        text: 'srv',
+        folded: false
+      }
+    })
+    const s = baseSticker({ id: 99, text: 'A' })
+    await pushNewStickerToServer(s)
+    expect(s.id).toBe(42)
   })
 
   it('pushNewStickerToServer: API error enqueues and 500 sets sync error', async () => {
@@ -215,6 +238,7 @@ describe('stickersRemoteSync', () => {
     stickersApiMocks.apiStickerPatch.mockResolvedValueOnce({
       res: { ok: true, status: 200 },
       sticker: {
+        display_id: 1,
         updated_at: '2025-07-01T00:00:00.000Z',
         text: 'from-api',
         folded: false,
@@ -282,6 +306,7 @@ describe('stickersRemoteSync', () => {
       res: { ok: true, status: 201 },
       sticker: {
         uuid: token,
+        display_id: 1,
         updated_at: '2025-08-01T00:00:00.000Z',
         text: 'q',
         folded: false
@@ -313,6 +338,7 @@ describe('stickersRemoteSync', () => {
             stickers: [
               {
                 uuid: 'cccccccc-cccc-4ccc-cccc-cccccccccccc',
+                display_id: 11,
                 updated_at: '2025-02-01T00:00:00.000Z',
                 text: 'from server',
                 folded: false
@@ -329,9 +355,9 @@ describe('stickersRemoteSync', () => {
     expect(mockMain.stickers.some((s) => s.token === 'cccccccc-cccc-4ccc-cccc-cccccccccccc')).toBe(
       true
     )
-    expect(mockMain.stickers.find((s) => s.token === 'cccccccc-cccc-4ccc-cccc-cccccccccccc').text).toBe(
-      'from server'
-    )
+    const added = mockMain.stickers.find((s) => s.token === 'cccccccc-cccc-4ccc-cccc-cccccccccccc')
+    expect(added.text).toBe('from server')
+    expect(added.id).toBe(11)
   })
 
   it('pullStickersSinceWatermark: local newer triggers PATCH to server', async () => {
@@ -417,6 +443,38 @@ describe('stickersRemoteSync', () => {
     expect(stickersApiMocks.apiStickersRemovedSince).toHaveBeenCalled()
     expect(mockMain.stickers.find((s) => s.token === token).text).toBe('local only')
     expect(stickersApiMocks.apiStickerPatch).not.toHaveBeenCalled()
+  })
+
+  it('pullStickersSinceWatermark: empty board resets nextId after removals (no stale counter)', async () => {
+    localStorage.setItem('stycky-pull-watermark-user-42', '2025-01-01T00:00:00.000Z')
+    mockMain.nextId = 50
+    mockMain.stickers.push(
+      baseSticker({
+        id: 30,
+        token: '11111111-1111-4111-8111-111111111111'
+      })
+    )
+
+    stickersApiMocks.apiStickersList.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: { stickers: [] }
+    })
+    stickersApiMocks.apiStickersRemovedSince.mockResolvedValueOnce({
+      res: { ok: true, status: 200 },
+      data: {
+        removed: [
+          {
+            uuid: '11111111-1111-4111-8111-111111111111',
+            deleted_at: '2025-02-01T00:00:00.000Z'
+          }
+        ]
+      }
+    })
+
+    await pullStickersSinceWatermark()
+
+    expect(mockMain.stickers).toHaveLength(0)
+    expect(mockMain.nextId).toBe(1)
   })
 
   it('pullStickersSinceWatermark: no content merge while board text edit token set', async () => {

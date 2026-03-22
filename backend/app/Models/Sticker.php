@@ -17,6 +17,7 @@ class Sticker extends Model
      */
     protected $fillable = [
         'user_id',
+        'display_id',
         'uuid',
         'text',
         'folded',
@@ -37,6 +38,7 @@ class Sticker extends Model
     protected function casts(): array
     {
         return [
+            'display_id' => 'integer',
             'folded' => 'boolean',
             'x' => 'integer',
             'y' => 'integer',
@@ -62,5 +64,16 @@ class Sticker extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Следующий display_id внутри уже открытой транзакции (см. lockForUpdate в контроллере).
+     */
+    public static function nextDisplayIdForUser(int $userId): int
+    {
+        // Уникальный индекс (user_id, display_id) на всей таблице; после очистки доски строки остаются с deleted_at — max без trashed дал бы 1 и конфликт при INSERT.
+        $max = (int) static::withTrashed()->forUser($userId)->lockForUpdate()->max('display_id');
+
+        return $max + 1;
     }
 }

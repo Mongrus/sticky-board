@@ -138,6 +138,30 @@ class StickerTest extends TestCase
             ->assertJsonPath('stickers', []);
     }
 
+    public function test_create_after_soft_deleting_all_stickers_gets_next_display_id_no_500(): void
+    {
+        $user = User::factory()->create();
+        Sticker::factory()->for($user)->create(['text' => 'a']);
+        Sticker::factory()->for($user)->create(['text' => 'b']);
+
+        Sticker::forUser($user->id)->each(fn (Sticker $sticker) => $sticker->delete());
+
+        $response = $this->actingAs($user)->postJson('/api/stickers', [
+            'text' => 'after clear',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('sticker.text', 'after clear')
+            ->assertJsonPath('sticker.display_id', 3);
+
+        $this->assertDatabaseHas('stickers', [
+            'user_id' => $user->id,
+            'display_id' => 3,
+            'text' => 'after clear',
+            'deleted_at' => null,
+        ]);
+    }
+
     public function test_removed_since_returns_soft_deleted_uuids(): void
     {
         $user = User::factory()->create();

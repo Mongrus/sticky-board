@@ -209,13 +209,26 @@ export function snapStickerLayoutInPlace(sticker) {
   sticker.z = L.z
 }
 
+/** Серверный display_id — общий «№» стикера для аккаунта; локальный id под него выравниваем после ответов API. */
 function applyServerMeta(local, remote) {
-  local.updated_at = remote.updated_at
+  if (remote?.updated_at != null) {
+    local.updated_at = remote.updated_at
+  }
+  if (remote?.display_id != null) {
+    const d = Number(remote.display_id)
+    if (!Number.isNaN(d)) {
+      local.id = d
+    }
+  }
 }
 
 function serverStickerToLocal(remote, numericId) {
+  const id =
+    remote?.display_id != null && !Number.isNaN(Number(remote.display_id))
+      ? Number(remote.display_id)
+      : numericId
   return {
-    id: numericId,
+    id,
     token: remote.uuid,
     updated_at: remote.updated_at,
     text: remote.text ?? '',
@@ -299,7 +312,7 @@ async function flushStickerPatch(token) {
 
   const { res, sticker: remote } = await apiStickerPatch(token, contentPayloadFromLocal(sticker))
   if (res.ok && remote?.updated_at) {
-    sticker.updated_at = remote.updated_at
+    applyServerMeta(sticker, remote)
     applyServerContentFromOwnPatchResponse(sticker, remote)
     clearLayoutSyncPending(token)
     bumpWatermarkFromServerRows(auth, [remote])
@@ -322,7 +335,7 @@ export async function pushNewStickerToServer(sticker) {
 
   const { res, sticker: remote } = await apiStickerCreate(postPayloadFromLocal(sticker))
   if (res.ok && remote?.updated_at) {
-    sticker.updated_at = remote.updated_at
+    applyServerMeta(sticker, remote)
     applyServerContentToLocal(sticker, remote)
     bumpWatermarkFromServerRows(auth, [remote])
   } else if (!res.ok) {
@@ -377,7 +390,7 @@ async function processStickersOutbox() {
         const store = await getMainStore()
         const loc = store.stickers.find((s) => s.token === op.token)
         if (loc && sticker?.updated_at) {
-          loc.updated_at = sticker.updated_at
+          applyServerMeta(loc, sticker)
           applyServerContentToLocal(loc, sticker)
         }
         bumpWatermarkFromServerRows(auth, sticker ? [sticker] : [])
@@ -394,7 +407,7 @@ async function processStickersOutbox() {
         const store = await getMainStore()
         const loc = store.stickers.find((s) => s.token === op.token)
         if (loc && sticker?.updated_at) {
-          loc.updated_at = sticker.updated_at
+          applyServerMeta(loc, sticker)
           applyServerContentFromOwnPatchResponse(loc, sticker)
           clearLayoutSyncPending(op.token)
         }
@@ -469,7 +482,7 @@ async function runIncrementalPullImpl() {
       } else if (cmp > 0) {
         const { res: pr, sticker: updated } = await apiStickerPatch(local.token, contentPayloadFromLocal(local))
         if (pr.ok && updated?.updated_at) {
-          local.updated_at = updated.updated_at
+          applyServerMeta(local, updated)
           applyServerContentFromOwnPatchResponse(local, updated)
           clearLayoutSyncPending(local.token)
         }
@@ -487,7 +500,10 @@ async function runIncrementalPullImpl() {
     )
   }
 
-  store.nextId = Math.max(store.nextId, maxId + 1)
+  // Всегда от фактического списка (как в full sync). Иначе после clear на другом устройстве
+  // maxId считался по стикерам до filter — nextId оставался 31+ при пустой доске.
+  store.nextId = store.stickers.reduce((m, s) => Math.max(m, s.id || 0), 0) + 1
+
   bumpWatermarkCombined(auth, rows, removedRows)
 }
 
@@ -621,7 +637,7 @@ async function runAuthenticatedBoardSyncImpl() {
   for (const local of postQueue) {
     const { res: r, sticker: created } = await apiStickerCreate(postPayloadFromLocal(local))
     if (r.ok && created?.updated_at) {
-      local.updated_at = created.updated_at
+      applyServerMeta(local, created)
       applyServerContentToLocal(local, created)
       watermarkRows.push(created)
     }
@@ -636,7 +652,7 @@ async function runAuthenticatedBoardSyncImpl() {
     }
     const { res: r, sticker: updated } = await apiStickerPatch(local.token, contentPayloadFromLocal(local))
     if (r.ok && updated?.updated_at) {
-      local.updated_at = updated.updated_at
+      applyServerMeta(local, updated)
       applyServerContentFromOwnPatchResponse(local, updated)
       clearLayoutSyncPending(local.token)
       if (updated) watermarkRows.push(updated)

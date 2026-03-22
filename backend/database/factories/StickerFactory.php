@@ -21,6 +21,7 @@ class StickerFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
+            'display_id' => 1,
             'uuid' => (string) Str::uuid(),
             'text' => fake()->optional()->sentence(),
             'folded' => false,
@@ -34,5 +35,18 @@ class StickerFactory extends Factory
             'tc' => '#2B2B2B',
             'z' => 0,
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterMaking(function (Sticker $model) {
+            $uid = $model->user_id;
+            if ($uid === null) {
+                return;
+            }
+            $max = (int) Sticker::withTrashed()->where('user_id', $uid)->max('display_id');
+
+            $model->display_id = $max > 0 ? $max + 1 : 1;
+        });
     }
 }

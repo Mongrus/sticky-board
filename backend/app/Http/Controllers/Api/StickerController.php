@@ -7,6 +7,7 @@ use App\Models\Sticker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -69,8 +70,37 @@ class StickerController extends Controller
             ->first();
 
         if ($trashed !== null) {
-            $trashed->restore();
-            $trashed->fill([
+            DB::transaction(function () use ($trashed, $validated) {
+                $trashed->restore();
+                $trashed->fill([
+                    'text' => $validated['text'] ?? '',
+                    'folded' => $validated['folded'] ?? false,
+                    'x' => $validated['x'] ?? 100,
+                    'y' => $validated['y'] ?? 100,
+                    'w' => $validated['w'] ?? 200,
+                    'h' => $validated['h'] ?? 120,
+                    'bc' => $validated['bc'] ?? '#FFF9B4',
+                    'font' => $validated['font'] ?? 'Andika, sans-serif',
+                    'fs' => $validated['fs'] ?? 14,
+                    'tc' => $validated['tc'] ?? '#2B2B2B',
+                    'z' => $validated['z'] ?? 0,
+                ]);
+                $trashed->save();
+            });
+            $trashed->refresh();
+
+            return response()->json([
+                'sticker' => $this->toApiArray($trashed),
+            ], 201);
+        }
+
+        $sticker = DB::transaction(function () use ($request, $validated, $uuid) {
+            $displayId = Sticker::nextDisplayIdForUser($request->user()->id);
+
+            return Sticker::create([
+                'user_id' => $request->user()->id,
+                'display_id' => $displayId,
+                'uuid' => $uuid,
                 'text' => $validated['text'] ?? '',
                 'folded' => $validated['folded'] ?? false,
                 'x' => $validated['x'] ?? 100,
@@ -83,29 +113,7 @@ class StickerController extends Controller
                 'tc' => $validated['tc'] ?? '#2B2B2B',
                 'z' => $validated['z'] ?? 0,
             ]);
-            $trashed->save();
-            $trashed->refresh();
-
-            return response()->json([
-                'sticker' => $this->toApiArray($trashed),
-            ], 201);
-        }
-
-        $sticker = Sticker::create([
-            'user_id' => $request->user()->id,
-            'uuid' => $uuid,
-            'text' => $validated['text'] ?? '',
-            'folded' => $validated['folded'] ?? false,
-            'x' => $validated['x'] ?? 100,
-            'y' => $validated['y'] ?? 100,
-            'w' => $validated['w'] ?? 200,
-            'h' => $validated['h'] ?? 120,
-            'bc' => $validated['bc'] ?? '#FFF9B4',
-            'font' => $validated['font'] ?? 'Andika, sans-serif',
-            'fs' => $validated['fs'] ?? 14,
-            'tc' => $validated['tc'] ?? '#2B2B2B',
-            'z' => $validated['z'] ?? 0,
-        ]);
+        });
 
         $sticker->refresh();
 
@@ -167,6 +175,7 @@ class StickerController extends Controller
 
         $rules = [
             'uuid' => $uuidRule,
+            'display_id' => ['prohibited'],
             'text' => ['sometimes', 'nullable', 'string', 'max:65535'],
             'folded' => ['sometimes', 'boolean'],
             'x' => ['sometimes', 'integer', 'between:-100000,100000'],
@@ -187,6 +196,7 @@ class StickerController extends Controller
     {
         return [
             'uuid' => $sticker->uuid,
+            'display_id' => $sticker->display_id,
             'updated_at' => $sticker->updated_at?->toIso8601String(),
             'text' => $sticker->text ?? '',
             'folded' => $sticker->folded,
